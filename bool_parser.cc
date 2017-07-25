@@ -1,4 +1,3 @@
-#include <vector>
 #include <stdlib.h>
 
 namespace checkpoint 
@@ -25,7 +24,7 @@ const int OPER_BRACKET_L = 13;
 const int OPER_BRACKET_R = 14;
 
 /*
-* 操作符字符串
+* 操作符
 */
 const char * TEXT_EQ	= "==";
 const char * TEXT_NE	= "!=";

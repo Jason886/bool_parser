@@ -23,11 +23,12 @@ size_t array_element_size(array_t *arr);
 int array_empty(array_t * arr);
 void array_shrink(array_t * arr);
 int array_push_back(array_t *arr, void * p_ele);
+int array_insert(array_t *arr, void * p_ele, size_t idx);
 void array_pop_back(array_t *arr);
 int array_at(array_t *arr, size_t idx, void * p_ele);
+int array_ref_at(array_t *arr, size_t idx, void **pp_ele);
 int array_front(array_t *arr, void * p_ele);
 int array_back(array_t * arr, void * p_ele);
-int array_insert(array_t *arr, void * p_ele, size_t idx);
 void array_erase(array_t *arr, size_t idx);
 void array_clear(array_t *arr);
 void array_foreach(array_t *arr, array_foreach_callback cb);
@@ -40,6 +41,9 @@ static inline int pre##_array_init(array_t *arr) { \
 } \
 static inline int pre##_array_push_back(array_t *arr, T e) { \
 	return array_push_back(arr, &e); \
+} \
+static inline int pre##_array_push_back_ref(array_t *arr, T*e) { \
+	return array_push_back(arr, e); \
 } \
 static inline int pre##_array_insert(array_t *arr, T e, size_t idx) { \
 	return array_insert(arr, &e, idx); \

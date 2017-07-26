@@ -1,7 +1,10 @@
+//#include <vector>
+#include "array.h"
 #include <stdlib.h>
-
-namespace checkpoint 
-{
+#include <string.h>
+#include <memory.h>
+#include <stdio.h>
+#include <ctype.h>
 
 
 /*
@@ -47,6 +50,7 @@ const char * TEXT_BRACKET_R	= ")";
 */
 typedef struct _opercfg_t 
 {
+public:
 	int oper;
 	char * text;
 	bool need_left;
@@ -54,7 +58,11 @@ typedef struct _opercfg_t
 	int priority_l;	// 在左边时优先级
 	int priority_r;	// 在右边时优先级
 
-	_opercfg_t(int oper, char * text, bool need_left, bool need_right, int priority_l, int priority_r)
+	/*
+	opercfg_t() 
+	{
+	}
+	opercfg_t(int oper, char * text, bool need_left, bool need_right, int priority_l, int priority_r)
 	{
 		this->oper = oper;
 		this->text = text;
@@ -63,9 +71,12 @@ typedef struct _opercfg_t
 		this->priority_l = priority_l;
 		this->priority_r = priority_r;
 	}
-} opercfg_t;
+	*/
+} opercfg_t ;
 
-static std::vector<opercfg_t> _oper_cfgs;
+ARRAY_DEFINE(opercfg_t, opercfg)
+static array_t _oper_cfgs;
+//static std::vector<opercfg_t> _oper_cfgs;
 
 typedef enum _nodetype
 {
@@ -84,11 +95,25 @@ typedef struct _node_t
 	struct _node_t * right;
 } node_t;
 
-static std::vector<node_t *> _stack1;
-static std::vector<node_t *> _stack2;
+ARRAY_DEFINE(node_t *, node)
+
+static array_t _stack1;
+static array_t _stack2;
+//static std::vector<node_t *> _stack1;
+//static std::vector<node_t *> _stack2;
 
 opercfg_t * _get_oper_cfg(int oper) 
 {
+	size_t i = 0;
+	while(i<array_size(&_oper_cfgs)) {
+		opercfg_t *cfg;
+		array_ref_at(&_oper_cfgs, i, (void **)&cfg);
+		if(cfg->oper == oper) {
+			return cfg;
+		}
+		i++;
+	}
+/*
 	for(int i=0; i< _oper_cfgs.size(); ++i)	
 	{
 		if(oper == _oper_cfgs[i].oper) 
@@ -96,6 +121,7 @@ opercfg_t * _get_oper_cfg(int oper)
 			return &_oper_cfgs[i];
 		}
 	}
+	*/
 	return NULL;
 }
 
@@ -106,8 +132,35 @@ bool _compare_oper_len(opercfg_t &a, opercfg_t &b)
 	return alen > blen;
 }
 
+int _compare_oper_len2(const void *a, const void *b)
+{
+	const opercfg_t * aa = (const opercfg_t *)a;
+	const opercfg_t * bb = (const opercfg_t *)b;
+	int alen = aa->text != 0 ? strlen(aa->text) : 0;
+	int blen = bb->text != 0 ? strlen(bb->text) : 0;
+	return alen > blen ? -1 : (alen < blen ? 1 : 0);
+}
+
 static void _init_oper_cfgs() 
 {
+	opercfg_array_init(&_oper_cfgs);
+	opercfg_array_push_back(&_oper_cfgs, opercfg_t{OPER_EQ, (char *)TEXT_EQ, true, true, 4, 4});
+	opercfg_array_push_back(&_oper_cfgs, opercfg_t{OPER_NE, (char *)TEXT_NE, true, true, 4, 4});
+	opercfg_array_push_back(&_oper_cfgs, opercfg_t{OPER_LT, (char *)TEXT_LT, true, true, 4, 4});
+	opercfg_array_push_back(&_oper_cfgs, opercfg_t{OPER_LE, (char *)TEXT_LE, true, true, 4, 4});
+	opercfg_array_push_back(&_oper_cfgs, opercfg_t{OPER_GT, (char *)TEXT_GT, true, true, 4, 4});
+	opercfg_array_push_back(&_oper_cfgs, opercfg_t{OPER_GE, (char *)TEXT_GE, true, true, 4, 4});
+	opercfg_array_push_back(&_oper_cfgs, opercfg_t{OPER_SE, (char *)TEXT_SE, true, true, 4, 4});
+	opercfg_array_push_back(&_oper_cfgs, opercfg_t{OPER_SNE, (char *)TEXT_SNE, true, true, 4, 4});
+	opercfg_array_push_back(&_oper_cfgs, opercfg_t{OPER_CE, (char *)TEXT_CE, true, true, 4, 4});
+	opercfg_array_push_back(&_oper_cfgs, opercfg_t{OPER_CNE, (char *)TEXT_CNE, true, true, 4, 4});
+	opercfg_array_push_back(&_oper_cfgs, opercfg_t{OPER_AND, (char *)TEXT_AND, true, true, 3, 3});
+	opercfg_array_push_back(&_oper_cfgs, opercfg_t{OPER_OR, (char *)TEXT_OR, true, true, 2, 2});
+	opercfg_array_push_back(&_oper_cfgs, opercfg_t{OPER_NOT, (char *)TEXT_NOT, false, true, 1, 7});
+	opercfg_array_push_back(&_oper_cfgs, opercfg_t{OPER_BRACKET_L, (char *)TEXT_BRACKET_L, false, false, 0, 8});
+	opercfg_array_push_back(&_oper_cfgs, opercfg_t{OPER_BRACKET_R, (char *)TEXT_BRACKET_R, false, false, 8, 0});
+
+	/*
 	_oper_cfgs.push_back(opercfg_t(OPER_EQ, (char *)TEXT_EQ, true, true, 4, 4));
 	_oper_cfgs.push_back(opercfg_t(OPER_NE, (char *)TEXT_NE, true, true, 4, 4));
 	_oper_cfgs.push_back(opercfg_t(OPER_LT, (char *)TEXT_LT, true, true, 4, 4));
@@ -125,6 +178,10 @@ static void _init_oper_cfgs()
 	_oper_cfgs.push_back(opercfg_t(OPER_BRACKET_R, (char *)TEXT_BRACKET_R, false, false, 8, 0));
 
 	std::sort(_oper_cfgs.begin(), _oper_cfgs.end(), _compare_oper_len);
+	*/
+	qsort(_oper_cfgs._data, _oper_cfgs._size, _oper_cfgs._element_size, _compare_oper_len2);
+	node_array_init(&_stack1);
+	node_array_init(&_stack2);
 }
 
 node_t * _new_node(nodetype type) 
@@ -183,42 +240,58 @@ void _output_node(node_t * node)
 
 void _clear_stack1()
 {
-	for(int i=0; i<_stack1.size(); ++i)
+	//for(int i=0; i<_stack1.size(); ++i)
+	for(int i=0; i<array_size(&_stack1); ++i)
 	{
-		_free_node(_stack1[i]);
+		node_t * node = 0;
+		array_at(&_stack1, i, &node);
+		//_free_node(_stack1[i]);
+		_free_node(node);
 	}
-	_stack1.clear();
+	array_clear(&_stack1);
+	//_stack1.clear();
 }
 
 void _clear_stack2()
 {
-	for(int i=0; i<_stack2.size(); ++i)
+	//for(int i=0; i<_stack2.size(); ++i)
+	for(int i=0; i< array_size(&_stack2); ++i)
 	{
-		_free_node(_stack2[i]);
+		node_t * node = 0;
+		array_at(&_stack2, i,  &node);
+		//_free_node(_stack2[i]);
+		_free_node(node);
 	}
-	_stack2.clear();
+	//_stack2.clear();
+	array_clear(&_stack2);
 }
 
 node_t * _pop_left_oper()
 {
 	while(true)
 	{
-		if(_stack1.size() == 0)
+		//if(_stack1.size() == 0)
+		if(array_size(&_stack1) == 0)
 		{
 			return NULL;
 		}
-		node_t * node = _stack1.back();
-		_stack1.pop_back();
+		//node_t * node = _stack1.back();
+		node_t * node;
+		array_back(&_stack1, &node);
+		array_pop_back(&_stack1);
+		//_stack1.pop_back();
 		if(node->type == TYPE_DATA)
 		{
-			_stack2.push_back(node);
+			node_array_push_back(&_stack2, node);
+			//_stack2.push_back(node);
 			continue;
 		}
 
 		opercfg_t *cfg = _get_oper_cfg(node->oper);
 		if(!cfg->need_right || NULL != node->right)
 		{
-			_stack2.push_back(node);
+			node_array_push_back(&_stack2, node);
+			//_stack2.push_back(node);
 			continue;
 		}
 
@@ -232,9 +305,12 @@ node_t * _pick_oper(char * exp_str, int * cursor)
 	{
 		return NULL;
 	}
-	for(int i=0; i < _oper_cfgs.size(); ++i)
+	//for(int i=0; i < _oper_cfgs.size(); ++i)
+	for(int i=0; i< array_size(&_oper_cfgs); ++i)
 	{
-		opercfg_t cfg = _oper_cfgs[i];
+		//opercfg_t cfg = _oper_cfgs[i];
+		opercfg_t cfg;
+		array_at(&_oper_cfgs, i, (void *)&cfg); 
 		int len = strlen(cfg.text);
 		//printf("cfg text %s\n", cfg.text);
 		//printf("exp_str %s\n", exp_str + (*cursor));
@@ -272,7 +348,7 @@ node_t * _pick_data(char *exp_str, int *cursor)
 	{
 		start = *cursor;
 		end = *cursor+3;
-		while(exp_str[end] != 0 && (isalpha(exp_str[end]) || isnumber(exp_str[end]) || exp_str[end] == '_' || exp_str[end] == '.')) {end++;}
+		while(exp_str[end] != 0 && (isalpha(exp_str[end]) || isdigit(exp_str[end]) || exp_str[end] == '_' || exp_str[end] == '.')) {end++;}
 	}
 	else if(!isspace(exp_str[*cursor]))
 	{
@@ -350,26 +426,38 @@ node_t * parse(char *exp_str)
 				node_t * left_oper = _pop_left_oper();
 				if(NULL == left_oper)
 				{
-					while(!_stack2.empty()) 
+					//while(!_stack2.empty()) 
+					while(!array_empty(&_stack2))
 					{
-						_stack1.push_back(_stack2.back());
-						_stack2.pop_back();
+						node_t * node;
+						array_back(&_stack2, &node);
+						node_array_push_back(&_stack1, node);
+						array_pop_back(&_stack2);
+
+						//_stack1.push_back(_stack2.back());
+						//_stack2.pop_back();
 					}
 
-					if(_stack1.size() > 1)
+					//if(_stack1.size() > 1)
+					if(array_size(&_stack1) > 1)
 					{
 						// error
 						_clear_stack1();
 						_clear_stack2();
 						return NULL;
 					}
+					
+					node_t *ret;
+					array_back(&_stack1, &ret);
+					array_pop_back(&_stack1);
 
-					node_t * ret = _stack1.back();
-					_stack1.pop_back();
+					//node_t * ret = _stack1.back();
+					//_stack1.pop_back();
 					return ret;
 				}
 
-				if(_stack2.empty())
+				//if(_stack2.empty())
+				if(array_empty(&_stack2))
 				{
 					// error
 					_clear_stack1();
@@ -377,15 +465,20 @@ node_t * parse(char *exp_str)
 					_free_node(left_oper);
 					return NULL;
 				}
-				left_oper->right = _stack2.back();
-				_stack2.pop_back();
-				_stack2.push_back(left_oper);
+				array_back(&_stack2, &left_oper->right);
+				array_pop_back(&_stack2);
+				node_array_push_back(&_stack2, left_oper);
+
+				//left_oper->right = _stack2.back();
+				//_stack2.pop_back();
+				//_stack2.push_back(left_oper);
 			}
 		}
 
 		if(node->type == TYPE_DATA)
 		{
-			_stack1.push_back(node);
+			node_array_push_back(&_stack1, node);
+			//_stack1.push_back(node);
 			continue;
 		}
 
@@ -393,14 +486,19 @@ node_t * parse(char *exp_str)
 		{
 			if(node->oper == OPER_BRACKET_L)
 			{
-				_stack1.push_back(node);
+				node_array_push_back(&_stack1, node);
+				//_stack1.push_back(node);
 				continue;
 			}
 
 			if(node->oper == OPER_BRACKET_R)
 			{
-				node_t * data = _stack1.back();
-				_stack1.pop_back();
+				node_t * data;
+				array_back(&_stack1, &data);
+				array_pop_back(&_stack1);
+
+				//node_t * data = _stack1.back();
+				//_stack1.pop_back();
 				if(data->type != TYPE_DATA)
 				{
 					opercfg_t * cfg = _get_oper_cfg(data->oper);
@@ -414,9 +512,13 @@ node_t * parse(char *exp_str)
 						return NULL;
 					}
 				}
+				
+				node_t *left_bracket;
+				array_back(&_stack1, &left_bracket);
+				array_pop_back(&_stack1);
 
-				node_t * left_bracket = _stack1.back();
-				_stack1.pop_back();
+				//node_t * left_bracket = _stack1.back();
+				//_stack1.pop_back();
 				if(left_bracket->oper != OPER_BRACKET_L)
 				{
 					// error
@@ -430,7 +532,8 @@ node_t * parse(char *exp_str)
 
 				_free_node(left_bracket);
 				_free_node(node);
-				_stack1.push_back(data);
+				node_array_push_back(&_stack1, data);
+				//_stack1.push_back(data);
 				continue;
 			}
 
@@ -447,7 +550,8 @@ node_t * parse(char *exp_str)
 					}
 					if(cfg->need_left)
 					{
-						if(_stack2.empty())
+						//if(_stack2.empty())
+						if(array_empty(&_stack2))
 						{
 							// error
 							_clear_stack1();
@@ -455,23 +559,38 @@ node_t * parse(char *exp_str)
 							_free_node(node);
 							return NULL;
 						}
-						while(!_stack2.empty()) 
+
+						//while(!_stack2.empty()) 
+						while(!array_empty(&_stack2))
 						{
-							_stack1.push_back(_stack2.back());
-							_stack2.pop_back();
+							node_t * node;
+							array_back(&_stack2, &node);
+							node_array_push_back(&_stack1, node);
+							array_pop_back(&_stack2);
+							//_stack1.push_back(_stack2.back());
+							//_stack2.pop_back();
 						}
-						node->left = _stack1.back();
-						_stack1.pop_back();
+						array_back(&_stack1, &node->left);
+						array_pop_back(&_stack1);
+
+						//node->left = _stack1.back();
+						//_stack1.pop_back();
 					}
 					else
 					{
-						while(!_stack2.empty()) 
+						//while(!_stack2.empty()) 
+						while(!array_empty(&_stack2))
 						{
-							_stack1.push_back(_stack2.back());
-							_stack2.pop_back();
+							node_t * node;
+							array_back(&_stack2, &node);
+							node_array_push_back(&_stack1, node);
+							array_pop_back(&_stack2);
+							//_stack1.push_back(_stack2.back());
+							//_stack2.pop_back();
 						}
 					}
-					_stack1.push_back(node);
+					node_array_push_back(&_stack1, node);
+					//_stack1.push_back(node);
 					break;
 				}
 
@@ -480,21 +599,31 @@ node_t * parse(char *exp_str)
 				opercfg_t * cfg = _get_oper_cfg(node->oper);
 				if(!cfg->need_left)
 				{
-					_stack1.push_back(left_oper);
-					while(!_stack2.empty()) 
+					node_array_push_back(&_stack1, left_oper);
+					//_stack1.push_back(left_oper);
+					//while(!_stack2.empty()) 
+					while(!array_empty(&_stack2))
 					{
-						_stack1.push_back(_stack2.back());
-						_stack2.pop_back();
+
+							node_t * node;
+							array_back(&_stack2, &node);
+							node_array_push_back(&_stack1, node);
+							array_pop_back(&_stack2);
+						//_stack1.push_back(_stack2.back());
+						//_stack2.pop_back();
 					}
-					_stack1.push_back(node);
+					node_array_push_back(&_stack1, node);
+					//_stack1.push_back(node);
 					break;
 				}
 
 				opercfg_t * left_cfg = _get_oper_cfg(left_oper->oper);
 				if(left_cfg->priority_r < cfg->priority_l)
 				{
-					_stack1.push_back(left_oper);
-					if (_stack2.empty())
+					node_array_push_back(&_stack1, left_oper);
+					//_stack1.push_back(left_oper);
+					//if (_stack2.empty())
+					if(array_empty(&_stack2))
 					{
 						// error
 						_clear_stack1();
@@ -502,18 +631,29 @@ node_t * parse(char *exp_str)
 						_free_node(node);
 						return NULL;
 					}
-					while(!_stack2.empty()) 
+					//while(!_stack2.empty()) 
+					while(!array_empty(&_stack2))
 					{
-						_stack1.push_back(_stack2.back());
-						_stack2.pop_back();
+
+							node_t * node;
+							array_back(&_stack2, &node);
+							node_array_push_back(&_stack1, node);
+							array_pop_back(&_stack2);
+						//_stack1.push_back(_stack2.back());
+						//_stack2.pop_back();
 					}
-					node->left = _stack1.back();
-					_stack1.pop_back();
-					_stack1.push_back(node);
+					array_back(&_stack1, &node->left);
+					array_pop_back(&_stack1);
+					node_array_push_back(&_stack1, node);
+
+					//node->left = _stack1.back();
+					//_stack1.pop_back();
+					//_stack1.push_back(node);
 					break;
 				}
 
-				if(_stack2.empty())
+				//if(_stack2.empty())
+				if(array_empty(&_stack2))
 				{
 					// error
 					_clear_stack1();
@@ -522,26 +662,28 @@ node_t * parse(char *exp_str)
 					_free_node(left_oper);
 					return NULL;
 				}
-				left_oper->right = _stack2.back();
-				_stack2.pop_back();
-				_stack2.push_back(left_oper);
+				array_back(&_stack2, &left_oper->right);
+				array_pop_back(&_stack2);
+				node_array_push_back(&_stack2, left_oper);
+
+				//left_oper->right = _stack2.back();
+				//_stack2.pop_back();
+				//_stack2.push_back(left_oper);
 			}
 		}
 	}
 }
 
-}
-
 int main()
 {
-	checkpoint::_init_oper_cfgs();
-	checkpoint::node_t * node = checkpoint::parse((char *)"a == b || c < d && e >= f || ! c");
+	_init_oper_cfgs();
+	node_t * node = parse((char *)"a == b || c < d && e >= f || ! c");
 	if(node == NULL)
 	{
 		printf("NULL\n");
 	}
-	checkpoint::_output_node(node);
+	_output_node(node);
 	printf("\nend\n");
-	//checkpoint::_free_node(node);
+	//_free_node(node);
 	return 0;
 }

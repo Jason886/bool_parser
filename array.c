@@ -132,6 +132,18 @@ int array_at(array_t *arr, size_t idx, void * p_ele) {
 	return -1;
 }
 
+int array_ref_at(array_t *arr, size_t idx, void **pp_ele) {
+	assert(arr);
+	assert(idx < arr->_size);
+
+	if(idx < arr->_size) {
+		size_t offset = arr->_element_size *idx;
+		*pp_ele = ((char *)arr->_data)+offset;
+		return 0;
+	}
+	return -1;
+}
+
 int array_front(array_t *arr, void * p_ele) {
 	assert(arr);
 	assert(arr->_size > 0);
@@ -227,7 +239,7 @@ void array_foreach_reverse(array_t *arr, array_foreach_callback cb) {
 	while(i>0) {
 		i--;
 		size_t offset = arr->_element_size *i;
-		char * p_ele = (void *) (((char *)arr->_data)+offset);
+		void * p_ele = (void *) (((char *)arr->_data)+offset);
 		if(cb) {
 			cb(arr, p_ele, i);
 		}

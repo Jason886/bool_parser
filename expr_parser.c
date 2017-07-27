@@ -209,20 +209,16 @@ node_t * _pop_left_oper(array_t *stack1, array_t *stack2)
 {
 	while(1)
 	{
-		//if(_stack1.size() == 0)
 		if(array_size(stack1) == 0)
 		{
 			return NULL;
 		}
-		//node_t * node = _stack1.back();
 		node_t * node;
 		array_back(stack1, &node);
 		array_pop_back(stack1);
-		//_stack1.pop_back();
 		if(node->type == _TYPE_DATA)
 		{
 			node_array_push_back(stack2, node);
-			//_stack2.push_back(node);
 			continue;
 		}
 
@@ -230,7 +226,6 @@ node_t * _pop_left_oper(array_t *stack1, array_t *stack2)
 		if(!cfg->need_right || NULL != node->right)
 		{
 			node_array_push_back(stack2, node);
-			//_stack2.push_back(node);
 			continue;
 		}
 
@@ -244,11 +239,9 @@ node_t * _pick_oper(char * exp_str, int * cursor)
 	{
 		return NULL;
 	}
-	//for(int i=0; i < _opercfgs.size(); ++i)
 	size_t i=0;
 	for(; i< array_size(&_opercfgs); ++i)
 	{
-		//opercfg_t cfg = _opercfgs[i];
 		opercfg_t cfg;
 		array_at(&_opercfgs, i, (void *)&cfg); 
 		int len = strlen(cfg.text);
@@ -311,8 +304,6 @@ node_t * _pick_data(char *exp_str, int *cursor)
 
 	printf("data:%s\n", data_tmp);
 
-	printf("end = %d\n", end);
-
 	*cursor = end;
 	return node;
 }
@@ -348,14 +339,11 @@ node_t * parse(char *exp_str, array_t * stack1, array_t * stack2)
 	_clear_stack(stack1);
 	_clear_stack(stack2);
 
-	printf("exp_str = %s\n", exp_str);
-
 	int cursor = 0;
 
 	while(1)
 	{
 		node_t * node = _get_next_node(exp_str, &cursor);
-		printf("cursor = %d\n", cursor);
 		if(NULL == node)
 		{
 			if(exp_str[cursor] != '\0')
@@ -366,27 +354,19 @@ node_t * parse(char *exp_str, array_t * stack1, array_t * stack2)
 				return NULL;
 			}
 
-			printf("结束符\n");
-
 			while(1)
 			{
-				//printf("_pop_left_oper\n");
 				node_t * left_oper = _pop_left_oper(stack1, stack2);
 				if(NULL == left_oper)
 				{
-					//while(!_stack2.empty()) 
 					while(!array_empty(stack2))
 					{
 						node_t * node;
 						array_back(stack2, &node);
 						node_array_push_back(stack1, node);
 						array_pop_back(stack2);
-
-						//_stack1.push_back(_stack2.back());
-						//_stack2.pop_back();
 					}
 
-					//if(_stack1.size() > 1)
 					if(array_size(stack1) > 1)
 					{
 						// error
@@ -399,12 +379,9 @@ node_t * parse(char *exp_str, array_t * stack1, array_t * stack2)
 					array_back(stack1, &ret);
 					array_pop_back(stack1);
 
-					//node_t * ret = _stack1.back();
-					//_stack1.pop_back();
 					return ret;
 				}
 
-				//if(_stack2.empty())
 				if(array_empty(stack2))
 				{
 					// error
@@ -416,17 +393,12 @@ node_t * parse(char *exp_str, array_t * stack1, array_t * stack2)
 				array_back(stack2, &left_oper->right);
 				array_pop_back(stack2);
 				node_array_push_back(stack2, left_oper);
-
-				//left_oper->right = _stack2.back();
-				//_stack2.pop_back();
-				//_stack2.push_back(left_oper);
 			}
 		}
 
 		if(node->type == _TYPE_DATA)
 		{
 			node_array_push_back(stack1, node);
-			//_stack1.push_back(node);
 			continue;
 		}
 
@@ -435,7 +407,6 @@ node_t * parse(char *exp_str, array_t * stack1, array_t * stack2)
 			if(node->oper == _OPER_BRK_L)
 			{
 				node_array_push_back(stack1, node);
-				//_stack1.push_back(node);
 				continue;
 			}
 
@@ -445,8 +416,6 @@ node_t * parse(char *exp_str, array_t * stack1, array_t * stack2)
 				array_back(stack1, &data);
 				array_pop_back(stack1);
 
-				//node_t * data = _stack1.back();
-				//_stack1.pop_back();
 				if(data->type != _TYPE_DATA)
 				{
 					opercfg_t * cfg = _opercfg_of(data->oper);
@@ -465,8 +434,6 @@ node_t * parse(char *exp_str, array_t * stack1, array_t * stack2)
 				array_back(stack1, &left_bracket);
 				array_pop_back(stack1);
 
-				//node_t * left_bracket = _stack1.back();
-				//_stack1.pop_back();
 				if(left_bracket->oper != _OPER_BRK_L)
 				{
 					// error
@@ -481,7 +448,6 @@ node_t * parse(char *exp_str, array_t * stack1, array_t * stack2)
 				_free_node(left_bracket);
 				_free_node(node);
 				node_array_push_back(stack1, data);
-				//_stack1.push_back(data);
 				continue;
 			}
 
@@ -498,7 +464,6 @@ node_t * parse(char *exp_str, array_t * stack1, array_t * stack2)
 					}
 					if(cfg->need_left)
 					{
-						//if(_stack2.empty())
 						if(array_empty(stack2))
 						{
 							// error
@@ -508,60 +473,42 @@ node_t * parse(char *exp_str, array_t * stack1, array_t * stack2)
 							return NULL;
 						}
 
-						//while(!_stack2.empty()) 
 						while(!array_empty(stack2))
 						{
 							node_t * node;
 							array_back(stack2, &node);
 							node_array_push_back(stack1, node);
 							array_pop_back(stack2);
-							//_stack1.push_back(_stack2.back());
-							//_stack2.pop_back();
 						}
 						array_back(stack1, &node->left);
 						array_pop_back(stack1);
-
-						//node->left = _stack1.back();
-						//_stack1.pop_back();
 					}
 					else
 					{
-						//while(!_stack2.empty()) 
 						while(!array_empty(stack2))
 						{
 							node_t * node;
 							array_back(stack2, &node);
 							node_array_push_back(stack1, node);
 							array_pop_back(stack2);
-							//_stack1.push_back(_stack2.back());
-							//_stack2.pop_back();
 						}
 					}
 					node_array_push_back(stack1, node);
-					//_stack1.push_back(node);
 					break;
 				}
-
-				//printf("left_oper != NULL\n");
 
 				opercfg_t * cfg = _opercfg_of(node->oper);
 				if(!cfg->need_left)
 				{
 					node_array_push_back(stack1, left_oper);
-					//_stack1.push_back(left_oper);
-					//while(!_stack2.empty()) 
 					while(!array_empty(stack2))
 					{
-
-							node_t * node;
-							array_back(stack2, &node);
-							node_array_push_back(stack1, node);
-							array_pop_back(stack2);
-						//_stack1.push_back(_stack2.back());
-						//_stack2.pop_back();
+						node_t * node;
+						array_back(stack2, &node);
+						node_array_push_back(stack1, node);
+						array_pop_back(stack2);
 					}
 					node_array_push_back(stack1, node);
-					//_stack1.push_back(node);
 					break;
 				}
 
@@ -569,8 +516,6 @@ node_t * parse(char *exp_str, array_t * stack1, array_t * stack2)
 				if(left_cfg->priority_r < cfg->priority_l)
 				{
 					node_array_push_back(stack1, left_oper);
-					//_stack1.push_back(left_oper);
-					//if (_stack2.empty())
 					if(array_empty(stack2))
 					{
 						// error
@@ -579,28 +524,20 @@ node_t * parse(char *exp_str, array_t * stack1, array_t * stack2)
 						_free_node(node);
 						return NULL;
 					}
-					//while(!_stack2.empty()) 
 					while(!array_empty(stack2))
 					{
-
-							node_t * node;
-							array_back(stack2, &node);
-							node_array_push_back(stack1, node);
-							array_pop_back(stack2);
-						//_stack1.push_back(_stack2.back());
-						//_stack2.pop_back();
+						node_t * node;
+						array_back(stack2, &node);
+						node_array_push_back(stack1, node);
+						array_pop_back(stack2);
 					}
 					array_back(stack1, &node->left);
 					array_pop_back(stack1);
 					node_array_push_back(stack1, node);
 
-					//node->left = _stack1.back();
-					//_stack1.pop_back();
-					//_stack1.push_back(node);
 					break;
 				}
 
-				//if(_stack2.empty())
 				if(array_empty(stack2))
 				{
 					// error
@@ -613,10 +550,6 @@ node_t * parse(char *exp_str, array_t * stack1, array_t * stack2)
 				array_back(stack2, &left_oper->right);
 				array_pop_back(stack2);
 				node_array_push_back(stack2, left_oper);
-
-				//left_oper->right = _stack2.back();
-				//_stack2.pop_back();
-				//_stack2.push_back(left_oper);
 			}
 		}
 	}

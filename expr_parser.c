@@ -196,7 +196,7 @@ expr_parser * expr_parser_new() {
 		_opercfgs_inited = 1;
 	}
 
-	expr_parser * parser = malloc(sizeof(expr_parser));
+	expr_parser * parser = (expr_parser*) malloc(sizeof(expr_parser));
 	if(parser) {
 		node_array_init(&(parser->_stack1));
 	}

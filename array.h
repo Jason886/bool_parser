@@ -3,6 +3,10 @@
 
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef void (*array_element_dealloc)(void *p_ele);
 
 typedef struct _array_t {
@@ -58,19 +62,9 @@ static inline void pre##_array_foreach_reverse(array_t *arr, pre##_array_foreach
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif

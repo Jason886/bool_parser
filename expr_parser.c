@@ -54,7 +54,7 @@ static const int _NODE_DATA		= 1;
  * 运算符配置
  */
 typedef struct _opercfg_t {
-	int oper;			// 运算符枚举
+	int oper;		// 运算符枚举
 	char * text;		// 运算符文本
 	int need_left;		// 需要左参数
 	int need_right;		// 需要右参数
@@ -197,6 +197,7 @@ expr_parser * expr_parser_new() {
 	}
 
 	expr_parser * parser = (expr_parser*) malloc(sizeof(expr_parser));
+	memset(parser, 0x00, sizeof(expr_parser));
 	if(parser) {
 		node_array_init(&(parser->_stack1));
 	}
@@ -207,10 +208,6 @@ expr_parser * expr_parser_new() {
 void expr_parser_delete(expr_parser *parser) {
 	if(parser) {
 		_clear_stack(&(parser->_stack1));
-		
-		if(parser->root) {
-			_free_node(parser->root);
-		}
 		free(parser);
 	}
 }
@@ -362,7 +359,7 @@ static int _deal_brk_r(array_t * stack1, expr_node_t * brk_node) {
 		if(0 == pre_oper) {
 			if(array_size(stack1) > 1) {
 				// error
-				printf("error at:%d unmatch ^) \n", brk_node->offset);
+				printf("error at:%lu unmatch ^) \n", brk_node->offset);
 				return -1;
 			}
 			return 0;
@@ -370,9 +367,10 @@ static int _deal_brk_r(array_t * stack1, expr_node_t * brk_node) {
 		if(_OPER_BRK_L == pre_oper->oper) {
 			if(array_size(stack1)-pre_oper_idx > 2) {
 				// error
-				printf("error at:%d more than 1 param in ^()\n", pre_oper->offset);
+				printf("error at:%lu more than 1 param in ^()\n", pre_oper->offset);
 				return -1;
 			}
+			_free_node(pre_oper);
 			array_erase(stack1, pre_oper_idx);
 			return 0;
 		}
@@ -380,13 +378,13 @@ static int _deal_brk_r(array_t * stack1, expr_node_t * brk_node) {
 		if(array_size(stack1)-pre_oper_idx<=1) {
 			// error
 			opercfg_t * cfg = _opercfg_of(pre_oper->oper);
-			printf("error at:%d need param after ^%s\n", pre_oper->offset, cfg->text);
+			printf("error at:%lu need param after ^%s\n", pre_oper->offset, cfg->text);
 			return -1;
 		}
 		expr_node_t * right = 0;
 		array_at(stack1, pre_oper_idx +1, &right);
-		array_erase(stack1, pre_oper_idx+1);
 		pre_oper->right = right;
+		array_erase(stack1, pre_oper_idx+1);
 		continue;
 	}
 }
@@ -397,7 +395,7 @@ static int _link_left(array_t* stack1, expr_node_t * link_node, size_t idx) {
 		if(cfg->need_left) {
 			if(array_size(stack1) == 0) {
 				// error
-				printf("error at:%d need param before ^%s\n", link_node->offset, cfg->text);
+				printf("error at:%lu need param before ^%s\n", link_node->offset, cfg->text);
 				return -1;
 			}
 			expr_node_t *left = 0;
@@ -406,16 +404,17 @@ static int _link_left(array_t* stack1, expr_node_t * link_node, size_t idx) {
 				opercfg_t * leftcfg = _opercfg_of(left->oper);
 				if(leftcfg->need_right && 0 == left->right) {
 					// error
-					printf("error at:%d need param before ^%s\n", link_node->offset, cfg->text);
+					printf("error at:%lu need param before ^%s\n", link_node->offset, cfg->text);
 					return -1;
 				}
 			}
-			array_erase(stack1, array_size(stack1)-1);
 			link_node->left = left;
+			array_erase(stack1, array_size(stack1)-1);
 			return 0;
 		}
 		return 0;
 	}
+	return 0;
 }
 
 static int _link_right(array_t* stack1, expr_node_t * link_node, size_t idx) {
@@ -423,7 +422,7 @@ static int _link_right(array_t* stack1, expr_node_t * link_node, size_t idx) {
 	if(cfg->need_right) {
 		if(idx == array_size(stack1) -1) {
 			// error
-			printf("error at:%d need param after ^%s\n", link_node->offset, cfg->text);
+			printf("error at:%lu need param after ^%s\n", link_node->offset, cfg->text);
 			return -1;
 		}
 		expr_node_t *right = 0;
@@ -492,7 +491,7 @@ static int _deal_end(array_t * stack1) {
 		if(_OPER_BRK_L == pre_oper->oper) {
 			// error
 			opercfg_t * cfg = _opercfg_of(pre_oper->oper);
-			printf("error at:%d unmatch with ^(\n", pre_oper->offset, cfg->text);
+			printf("error at:%lu unmatch with ^%s\n", pre_oper->offset, cfg->text);
 			return -1;
 		}
 
@@ -501,7 +500,7 @@ static int _deal_end(array_t * stack1) {
 		if(size-pre_oper_idx<=1) {
 			// error
 			opercfg_t * cfg = _opercfg_of(pre_oper->oper);
-			printf("error at:%d need param after ^%s\n", pre_oper->offset, cfg->text);
+			printf("error at:%lu need param after ^%s\n", pre_oper->offset, cfg->text);
 			return -1;
 		}
 		expr_node_t * right = 0;
@@ -546,13 +545,16 @@ static expr_node_t * _parse_it(char *exp_str, array_t * stack1) {
 				continue;
 			}
 			if(_OPER_BRK_R == node->oper) {
-				if(	_deal_brk_r(stack1, node) < 0) {
+				if(_deal_brk_r(stack1, node) < 0) {
+					_free_node(node);
 					return 0;
 				}
+				_free_node(node);
 				continue;
 			}
 
 			if(_deal_oper_node(stack1, node) < 0) {
+				_free_node(node);
 				return 0;
 			}
 		}
@@ -562,10 +564,7 @@ static expr_node_t * _parse_it(char *exp_str, array_t * stack1) {
 void expr_parser_reset(expr_parser *parser) {
 	if(parser) {
 		_clear_stack(&parser->_stack1);
-		if(parser->root) {
-			_free_node(parser->root);
-			parser->root = 0;
-		}
+		parser->root = 0;
 	}
 }
 
@@ -635,7 +634,7 @@ static int _execute_oper_node(expr_node_t *node, int * result, expr_value_getter
 			val_l.nValue = lVal;
 		}
 		else {
-			if(	_execute_data_node(left, &val_l, getter) < 0) {
+			if(_execute_data_node(left, &val_l, getter) < 0) {
 				return -1;
 			}
 		} 
@@ -650,7 +649,7 @@ static int _execute_oper_node(expr_node_t *node, int * result, expr_value_getter
 			val_r.nValue = rVal;
 		}
 		else {
-			if(	_execute_data_node(right, &val_r, getter) < 0) {
+			if(_execute_data_node(right, &val_r, getter) < 0) {
 				return -1;
 			}
 		} 
@@ -731,4 +730,13 @@ int expr_parser_execute(expr_parser *parser, int *result, expr_value_getter gett
 	if(!parser->root) return -1;
 	if(parser->root->type != _NODE_OPER) return -1;
 	return _execute_oper_node(parser->root, result, getter);
+}
+
+
+void expr_parser_print_tree(expr_parser *parser) {
+	if(parser) {
+		if(parser->root) {
+			_output_node(parser->root);
+		}
+	}
 }

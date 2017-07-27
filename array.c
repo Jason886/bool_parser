@@ -1,6 +1,6 @@
+#include <stdlib.h>
 #include <assert.h>
 #include <memory.h>
-#include <malloc.h>
 #include "array.h"
 
 #define _ORI_CAPACITY 4

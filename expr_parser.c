@@ -1,4 +1,5 @@
 #include "array.h"
+#include "expr_parser.h"
 #include <stdlib.h>
 #include <string.h>
 #include <memory.h>
@@ -43,11 +44,6 @@ static const char * _TEXT_NOT	= "!";
 static const char * _TEXT_BRK_L	= "(";
 static const char * _TEXT_BRK_R	= ")";
 
-/*
- * 语法树节点类型
- */
-static const int _TYPE_OPER		= 0;
-static const int _TYPE_DATA		= 1;
 
 /*
 * 运算符配置
@@ -61,26 +57,11 @@ typedef struct _opercfg_t {
 	int priority_r;		// 在右边时优先级
 } opercfg_t ;
 
-typedef struct _node_t {
-	int type;			// 0-运算符, 1-数据
-	union {
-		int oper;
-		char * data;
-	};
-	struct _node_t * left;
-	struct _node_t * right;
-} node_t;
 
 ARRAY_DEFINE(opercfg_t, opercfg)
 ARRAY_DEFINE(node_t *, node)
 
 static array_t _opercfgs;
-
-typedef struct _bparser {
-	struct _node_t * root;
-	array_t _stack1;
-	array_t _stack2;
-} bparser;
 
 static opercfg_t _new_opercfg(int oper, char * text, int need_left, int need_right, int priority_l, int priority_r) {
 	opercfg_t cfg = {oper, text, need_left, need_right, priority_l, priority_r};
@@ -140,7 +121,7 @@ static void _free_node(node_t *node)
 	}
 }
 
-static void _output_node(node_t * node)
+void _output_node(node_t * node)
 {
 	if(NULL != node->left)
 	{
@@ -659,19 +640,3 @@ void bparser_parse(bparser * parser, char *exp_str) {
 	}
 }
 
-int main()
-{
-	bparser * parser = bparser_new();
-	//node_t * node = parse((char *)"a == b || c < d && e >= f || ! c");
-	bparser_parse(parser, (char*)"a == b");
-	node_t *node = parser->root;
-	if(node == NULL)
-	{
-		printf("NULL\n");
-	}
-	_output_node(node);
-	printf("\nend\n");
-	_free_node(node);
-	bparser_delete(parser);
-	return 0;
-}

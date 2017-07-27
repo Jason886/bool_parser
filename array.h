@@ -56,8 +56,6 @@ static inline void pre##_array_foreach_reverse(array_t *arr, pre##_array_foreach
 	return array_foreach_reverse(arr, (array_foreach_callback) cb); \
 }
 
-ARRAY_DEFINE(int, int)
-ARRAY_DEFINE(char*, string)
 
 
 

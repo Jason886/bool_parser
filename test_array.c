@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+ARRAY_DEFINE(int, int)
+ARRAY_DEFINE(char*, string)
+
 void out_put_int(array_t *arr, int *p_ele, size_t idx)
 {
 	printf("[%d] = [%d]\n", idx, * p_ele);

@@ -7,8 +7,8 @@
 #include <ctype.h>
 
 /*
-* 运算符枚举
-*/
+ * 运算符枚举
+ */
 static const int _OPER_EQ		= 0;	// ==	, 数字相等
 static const int _OPER_NE		= 1;	// !=	, 数字不等
 static const int _OPER_LT		= 2;	// <	, 数字小于
@@ -26,8 +26,8 @@ static const int _OPER_BRK_L	= 13;	// (	, 左括号
 static const int _OPER_BRK_R	= 14;	// )	, 右括号
 
 /*
-* 运算符
-*/
+ * 运算符
+ */
 static const char * _TEXT_EQ	= "==";
 static const char * _TEXT_NE	= "!=";
 static const char * _TEXT_LT	= "<";
@@ -44,10 +44,15 @@ static const char * _TEXT_NOT	= "!";
 static const char * _TEXT_BRK_L	= "(";
 static const char * _TEXT_BRK_R	= ")";
 
+/*
+ * 语法树节点类型
+ */
+static const int _NODE_OPER		= 0;
+static const int _NODE_DATA		= 1;
 
 /*
-* 运算符配置
-*/
+ * 运算符配置
+ */
 typedef struct _opercfg_t {
 	int oper;			// 运算符枚举
 	char * text;		// 运算符文本
@@ -57,13 +62,34 @@ typedef struct _opercfg_t {
 	int priority_r;		// 在右边时优先级
 } opercfg_t ;
 
+/*
+ * 语法树节点
+ */
+typedef struct _expr_node_t {
+	int type;			// 0-运算符, 1-数据
+	union {
+		int oper;
+		char * data;
+	};
+	size_t offset;
+	struct _expr_node_t * left;
+	struct _expr_node_t * right;
+} expr_node_t;
+
+/*
+ * 解析器
+ */
+struct expr_parser {
+	struct _expr_node_t * root;
+	array_t _stack1;
+};
 
 ARRAY_DEFINE(opercfg_t, opercfg)
 ARRAY_DEFINE(expr_node_t *, node)
 
 static array_t _opercfgs;
 
-static opercfg_t _new_opercfg(int oper, char * text, int need_left, int need_right, int priority_l, int priority_r) {
+static inline opercfg_t _new_opercfg(int oper, char * text, int need_left, int need_right, int priority_l, int priority_r) {
 	opercfg_t cfg = {oper, text, need_left, need_right, priority_l, priority_r};
 	return cfg;
 }
@@ -78,7 +104,7 @@ static opercfg_t * _opercfg_of(int oper) {
 			return cfg;
 		}
 	}
-	return NULL;
+	return 0;
 }
 
 static int _cmp_oper_len(const void *a, const void *b) {
@@ -89,31 +115,24 @@ static int _cmp_oper_len(const void *a, const void *b) {
 	return alen > blen ? -1 : (alen < blen ? 1 : 0);
 }
 
-static expr_node_t * _new_node(int type) 
-{
+static expr_node_t * _new_node(int type) {
 	expr_node_t * node = (expr_node_t *) malloc(sizeof(expr_node_t));
 	memset(node, 0x00, sizeof(expr_node_t));
 	node->type = type;
 	return node;
 }
 
-static void _free_node(expr_node_t *node) 
-{
-	if(NULL != node) 
-	{
-		if(EXPR_NODE_DATA == node->type) 
-		{
-			if(NULL != node->data) 
-			{
+static void _free_node(expr_node_t *node) {
+	if(0 != node) {
+		if(_NODE_DATA == node->type) {
+			if(0 != node->data) {
 				free(node->data);
 			}
 		}
-		if(NULL != node->left) 
-		{
+		if(0 != node->left) {
 			_free_node(node->left);
 		}
-		if(NULL != node->right) 
-		{
+		if(0 != node->right) {
 			_free_node(node->right);
 		}
 
@@ -121,30 +140,24 @@ static void _free_node(expr_node_t *node)
 	}
 }
 
-void _output_node(expr_node_t * node)
-{
-	if(NULL != node->left)
-	{
+static void _output_node(expr_node_t * node) {
+	if(0 != node->left) {
 		_output_node(node->left);
 	}
-	if(NULL != node->right)
-	{
+	if(0 != node->right) {
 		_output_node(node->right);
 	}
 
-	if(node->type == EXPR_NODE_OPER)
-	{
+	if(node->type == _NODE_OPER) {
 		opercfg_t * cfg = _opercfg_of(node->oper);
 		printf("%s, ", cfg->text);
 	}
-	else
-	{
+	else {
 		printf("%s, ", node->data);
 	}
 }
 
-static void _clear_stack(array_t * stack)
-{
+static void _clear_stack(array_t * stack) {
 	if(stack) {
 		size_t i = 0;
 		size_t size = array_size(stack);
@@ -157,8 +170,7 @@ static void _clear_stack(array_t * stack)
 	}
 }
 
-expr_parser * expr_parser_new() 
-{
+expr_parser * expr_parser_new() {
 	static int _opercfgs_inited = 0;
 	if(!_opercfgs_inited) {
 		opercfg_array_init(&_opercfgs);
@@ -187,7 +199,6 @@ expr_parser * expr_parser_new()
 	expr_parser * parser = malloc(sizeof(expr_parser));
 	if(parser) {
 		node_array_init(&(parser->_stack1));
-		node_array_init(&(parser->_stack2));
 	}
 
 	return parser;
@@ -196,7 +207,6 @@ expr_parser * expr_parser_new()
 void expr_parser_delete(expr_parser *parser) {
 	if(parser) {
 		_clear_stack(&(parser->_stack1));
-		_clear_stack(&(parser->_stack2));
 		
 		if(parser->root) {
 			_free_node(parser->root);
@@ -205,103 +215,82 @@ void expr_parser_delete(expr_parser *parser) {
 	}
 }
 
-expr_node_t * _pop_left_oper(array_t *stack1, array_t *stack2)
-{
-	while(1)
-	{
-		if(array_size(stack1) == 0)
-		{
-			return NULL;
-		}
-		expr_node_t * node;
-		array_back(stack1, &node);
-		array_pop_back(stack1);
-		if(node->type == EXPR_NODE_DATA)
-		{
-			node_array_push_back(stack2, node);
-			continue;
-		}
-
-		opercfg_t *cfg = _opercfg_of(node->oper);
-		if(!cfg->need_right || NULL != node->right)
-		{
-			node_array_push_back(stack2, node);
-			continue;
-		}
-
-		return node;
-	}
-}
-
-expr_node_t * _pick_oper(char * exp_str, int * cursor) 
-{
+expr_node_t * _pick_oper(char * exp_str, int * cursor) {
 	if(exp_str[*cursor] == '\0') {
 		return 0;
 	}
 	size_t i=0;
-	for(; i< array_size(&_opercfgs); ++i)
-	{
+	for(; i< array_size(&_opercfgs); ++i) {
 		opercfg_t cfg;
 		array_at(&_opercfgs, i, (void *)&cfg); 
 		int len = strlen(cfg.text);
-		if(strncmp(exp_str + (*cursor), cfg.text, len) == 0) 
-		{
-			expr_node_t *node = _new_node(EXPR_NODE_OPER);
+		if(strncmp(exp_str + (*cursor), cfg.text, len) == 0) {
+			expr_node_t *node = _new_node(_NODE_OPER);
 			node->oper = cfg.oper;
-			node->left=NULL;
-			node->right=NULL;
+			node->left=0;
+			node->right=0;
 			(*cursor) += len;
 			printf("oper: %s end: %d\n", cfg.text, (*cursor));
 			return node;
 		}
 	}
 
-	return NULL;
+	return 0;
 }
 
-static inline  int _is_data_char(char c) {
+static inline  int _is_varname_char(char c) {
 	return ( isalpha(c) || isdigit(c) || c == '_' || c == '.' || c == '[' || c == ']');
 }
 
-expr_node_t * _pick_data(char *exp_str, int *cursor) 
+static expr_node_t * _pick_data(char *exp_str, int *cursor) 
 {
-	if(exp_str[*cursor] == '\0')
-	{
-		return NULL;
+	if(exp_str[*cursor] == '\0') {
+		return 0;
 	}
 	int start = -1;
 	int end = -1;
-	if(exp_str[*cursor] == '\"') 
-	{
+	if(exp_str[*cursor] == '\"') {
 		start = *cursor;
 		end = *cursor+1;
 		while(exp_str[end] != 0 && exp_str[end] != '\"')	{ end++;}
 		if(exp_str[end] == '\"') end++;
 	}
-	else if(strncmp(exp_str+*cursor, "id:", 3) == 0) 
+	else if(exp_str[*cursor] == '\'') {
+		start = *cursor;
+		end = *cursor+1;
+		while(exp_str[end] != 0 && exp_str[end] != '\'')	{ end++;}
+		if(exp_str[end] == '\'') end++;
+	}
+	else if(strncmp(exp_str+*cursor, "[[", 2) == 0) {
+		start = *cursor;
+		end = *cursor+1;
+		while(exp_str[end] != 0 && exp_str[end] != ']' &&exp_str[end-1] != ']')	{ end++;}
+		if(exp_str[end] == ']') end++;
+	}
+	else if(strncmp(exp_str+*cursor, "$", 1) == 0) 
 	{
 		start = *cursor;
 		end = *cursor+3;
-		while(_is_data_char(exp_str[end])) {end++;}
+		while(_is_varname_char(exp_str[end])) {end++;}
 	}
-	else if(_is_data_char(exp_str[*cursor]))
+	else if(_is_varname_char(exp_str[*cursor]))
 	{
 		start = *cursor;
 		end = *cursor + 1;
-		while(_is_data_char(exp_str[end])) {end++;}
+		while(_is_varname_char(exp_str[end])) {end++;}
 	}
 	else {
-		return NULL;
+		return 0;
 	}
 
 	char *data_tmp = (char *)malloc(end-start+1);
 	memset(data_tmp, 0x00, end-start+1);
 	memcpy(data_tmp, exp_str+start, end-start);
 
-	expr_node_t * node = _new_node(EXPR_NODE_DATA);
+	expr_node_t * node = _new_node(_NODE_DATA);
 	node->data = data_tmp;
-	node->left = NULL;
-	node->right = NULL;
+	node->left = 0;
+	node->right = 0;
 
 	printf("data:%s end:%d\n", data_tmp, end);
 
@@ -309,24 +298,19 @@ expr_node_t * _pick_data(char *exp_str, int *cursor)
 	return node;
 }
 
-void _slip_space(char *exp_str, int *cursor) 
-{
-	if(exp_str[*cursor] == '\0')
-	{
+static void _slip_space(char *exp_str, int *cursor) {
+	if(exp_str[*cursor] == '\0') {
 		return;
 	}
-	while(isspace(exp_str[*cursor])) 
-	{
+	while(isspace(exp_str[*cursor])) {
 		(*cursor)++;
 	}
 }
 
-expr_node_t * _get_next_node(char *exp_str, int *cursor)
-{
+static expr_node_t * _get_next_node(char *exp_str, int *cursor) {
 	_slip_space(exp_str, cursor);
 	expr_node_t * node = _pick_oper(exp_str, cursor);
-	if(NULL != node)
-	{
+	if(node) {
 		return node;
 	}
 	_slip_space(exp_str, cursor);
@@ -334,14 +318,14 @@ expr_node_t * _get_next_node(char *exp_str, int *cursor)
 	return node;
 }
 
-void _get_pre_oper(array_t * stack1, expr_node_t ** pre_oper, size_t *oper_idx) {
+static void _get_pre_oper(array_t * stack1, expr_node_t ** pre_oper, size_t *oper_idx) {
 	size_t idx = array_size(stack1);
 	while(idx > 0) {
 		idx --;
 		expr_node_t *node = 0;
 		array_at(stack1, idx, &node);
 		if(node) {
-			if(EXPR_NODE_OPER == node->type) {
+			if(_NODE_OPER == node->type) {
 				if(_OPER_BRK_L == node->oper) {
 					*pre_oper = node;
 					*oper_idx = idx;
@@ -359,12 +343,7 @@ void _get_pre_oper(array_t * stack1, expr_node_t ** pre_oper, size_t *oper_idx) 
 	return;
 }
 
-
-void _deal_data(array_t * stack1, expr_node_t * data_node) {
-	node_array_push_back(stack1, data_node);
-}
-
-int _deal_brk_r(array_t * stack1, expr_node_t * brk_node) {
+static int _deal_brk_r(array_t * stack1, expr_node_t * brk_node) {
 	while(1) {
 		expr_node_t * pre_oper = 0;
 		size_t pre_oper_idx = 0;
@@ -401,7 +380,7 @@ int _deal_brk_r(array_t * stack1, expr_node_t * brk_node) {
 	}
 }
 
-int _link_left(array_t* stack1, expr_node_t * link_node, size_t idx) {
+static int _link_left(array_t* stack1, expr_node_t * link_node, size_t idx) {
 	if(idx == -1) {
 		opercfg_t * cfg = _opercfg_of(link_node->oper);
 		if(cfg->need_left) {
@@ -412,7 +391,7 @@ int _link_left(array_t* stack1, expr_node_t * link_node, size_t idx) {
 			}
 			expr_node_t *left = 0;
 			array_at(stack1, array_size(stack1)-1, &left);
-			if(EXPR_NODE_OPER == left->type) {
+			if(_NODE_OPER == left->type) {
 				opercfg_t * leftcfg = _opercfg_of(left->oper);
 				if(leftcfg->need_right && 0 == left->right) {
 					// error
@@ -428,7 +407,7 @@ int _link_left(array_t* stack1, expr_node_t * link_node, size_t idx) {
 	}
 }
 
-int _link_right(array_t* stack1, expr_node_t * link_node, size_t idx) {
+static int _link_right(array_t* stack1, expr_node_t * link_node, size_t idx) {
 	opercfg_t * cfg = _opercfg_of(link_node->oper);
 	if(cfg->need_right) {
 		if(idx == array_size(stack1) -1) {
@@ -445,7 +424,7 @@ int _link_right(array_t* stack1, expr_node_t * link_node, size_t idx) {
 	return 0;
 }
 
-int _deal_oper_node(array_t * stack1, expr_node_t * oper_node) {
+static int _deal_oper_node(array_t * stack1, expr_node_t * oper_node) {
 	opercfg_t * curcfg = _opercfg_of(oper_node->oper);
 	while(1) {
 		expr_node_t * pre_oper = 0;
@@ -480,7 +459,7 @@ int _deal_oper_node(array_t * stack1, expr_node_t * oper_node) {
 	}
 }
 
-int _deal_end(array_t * stack1) {
+static int _deal_end(array_t * stack1) {
 	while(1) {
 		expr_node_t * pre_oper = 0;
 		size_t pre_oper_idx = 0;
@@ -522,22 +501,18 @@ int _deal_end(array_t * stack1) {
 	}
 }
 
-expr_node_t * parse(char *exp_str, array_t * stack1, array_t * stack2)
-{
+static expr_node_t * _parse_it(char *exp_str, array_t * stack1) {
 	_clear_stack(stack1);
-	_clear_stack(stack2);
 
 	int cursor = 0;
 
-	while(1)
-	{
+	while(1) {
 		expr_node_t * node = _get_next_node(exp_str, &cursor);
 		if(!node) {
 			if(exp_str[cursor] != '\0') {
 				// error
 				printf("error at:%d, unrecognized character:^%c\n", cursor, exp_str[cursor]);
 				_clear_stack(stack1);
-				_clear_stack(stack2);
 				return 0;
 			}
 
@@ -550,24 +525,24 @@ expr_node_t * parse(char *exp_str, array_t * stack1, array_t * stack2)
 			return ret;
 		}
 
-		if(node->type == EXPR_NODE_DATA) {
+		if(node->type == _NODE_DATA) {
 			node_array_push_back(stack1, node);
 			continue;
 		}
-		if(node->type == EXPR_NODE_OPER) {
+		if(node->type == _NODE_OPER) {
 			if(_OPER_BRK_L == node->oper) {
 				node_array_push_back(stack1, node);
 				continue;
 			}
 			if(_OPER_BRK_R == node->oper) {
 				if(	_deal_brk_r(stack1, node) < 0) {
-					return NULL;
+					return 0;
 				}
 				continue;
 			}
 
 			if(_deal_oper_node(stack1, node) < 0) {
-				return NULL;
+				return 0;
 			}
 		}
 	}
@@ -576,7 +551,6 @@ expr_node_t * parse(char *exp_str, array_t * stack1, array_t * stack2)
 void expr_parser_reset(expr_parser *parser) {
 	if(parser) {
 		_clear_stack(&parser->_stack1);
-		_clear_stack(&parser->_stack2);
 		if(parser->root) {
 			_free_node(parser->root);
 			parser->root = 0;
@@ -587,15 +561,14 @@ void expr_parser_reset(expr_parser *parser) {
 void expr_parser_parse(expr_parser * parser, char *exp_str) {
 	if(parser) {
 		expr_parser_reset(parser);
-		parser->root = parse(exp_str, &parser->_stack1, &parser->_stack2);
+		parser->root = _parse_it(exp_str, &parser->_stack1);
 	}
 }
 
-
 static int _execute_data_node(expr_node_t *node, expr_value * value, expr_value_getter getter) {
-	if(strncmp(node->data, "id:", 3) == 0) {
+	if(strncmp(node->data, "$", 1) == 0) {
 		char *data = 0;
-		if(getter((char *)node->data+3, &data) < 0) {
+		if(getter((char *)node->data+1, &data) < 0) {
 			return -1;
 		}
 		value->valueType = 1;
@@ -612,7 +585,10 @@ static int _execute_data_node(expr_node_t *node, expr_value * value, expr_value_
 static int64_t _get_number_value(expr_value * v) {
 	int64_t vv = v->nValue;
 	if(v->valueType == 1) {
-		if(strcmp(v->pValue, "true") == 0) {
+		if(!v->pValue) {
+			vv = 0;
+		}
+		else if(strcmp(v->pValue, "true") == 0) {
 			vv = 1;
 		}
 		else if(strcmp(v->pValue, "false") == 0) {
@@ -625,18 +601,19 @@ static int64_t _get_number_value(expr_value * v) {
 	return vv;
 }
 
-static int _execute_oper_node(expr_node_t *node, expr_value *value, expr_value_getter getter) {
-	value->valueType = 0;
-	value->nValue = 0;
-	expr_value val_l, val_r;
+static int _execute_oper_node(expr_node_t *node, int * result, expr_value_getter getter) {
+	opercfg_t * cfg = _opercfg_of(node->oper);
 	expr_node_t * left = node->left;
 	expr_node_t *right = node->right;
-	opercfg_t * cfg = _opercfg_of(node->oper);
+	expr_value val_l, val_r;
 	if(cfg->need_left) {
-		if(EXPR_NODE_OPER == left->type) {
-			if(_execute_oper_node(left, &val_l, getter) < 0) {
+		if(_NODE_OPER == left->type) {
+			int lVal = 0;
+			if(_execute_oper_node(left, &lVal, getter) < 0) {
 				return -1;
 			}
+			val_l.valueType = 0;
+			val_l.nValue = lVal;
 		}
 		else {
 			if(	_execute_data_node(left, &val_l, getter) < 0) {
@@ -645,11 +622,13 @@ static int _execute_oper_node(expr_node_t *node, expr_value *value, expr_value_g
 		} 
 	}
 	if(cfg->need_right) {
-		if(EXPR_NODE_OPER == right->type) {
-			if(_execute_oper_node(right, &val_r, getter) < 0) {
+		if(_NODE_OPER == right->type) {
+			int rVal = 0;
+			if(_execute_oper_node(right, &rVal, getter) < 0) {
 				return -1;
 			}
-			
+			val_r.valueType = 0;
+			val_r.nValue = rVal;
 		}
 		else {
 			if(	_execute_data_node(right, &val_r, getter) < 0) {
@@ -661,83 +640,66 @@ static int _execute_oper_node(expr_node_t *node, expr_value *value, expr_value_g
 	if(node->oper == _OPER_EQ) {
 			int64_t lNum = _get_number_value(&val_l);
 			int64_t rNum = _get_number_value(&val_r);
-			value->valueType = 0;
-			value->nValue = lNum == rNum;
+			*result = lNum == rNum;
 	}
 	else if(node->oper == _OPER_NE) {
 			int64_t lNum = _get_number_value(&val_l);
 			int64_t rNum = _get_number_value(&val_r);
-			value->valueType = 0;
-			value->nValue = lNum != rNum;
+			*result = lNum != rNum;
 	}
 	else if(node->oper == _OPER_LT) {
 			int64_t lNum = _get_number_value(&val_l);
 			int64_t rNum = _get_number_value(&val_r);
-			value->valueType = 0;
-			value->nValue = lNum < rNum;
+			*result = lNum < rNum;
 	}
 	else if(node->oper == _OPER_LE) {
 			int64_t lNum = _get_number_value(&val_l);
 			int64_t rNum = _get_number_value(&val_r);
-			value->valueType = 0;
-			value->nValue = lNum <= rNum;
+			*result = lNum <= rNum;
 	}
 	else if(node->oper == _OPER_GT) {
 			int64_t lNum = _get_number_value(&val_l);
 			int64_t rNum = _get_number_value(&val_r);
-			value->valueType = 0;
-			value->nValue = lNum > rNum;
+			*result = lNum > rNum;
 	}
 	else if(node->oper == _OPER_GE) {
 			int64_t lNum = _get_number_value(&val_l);
 			int64_t rNum = _get_number_value(&val_r);
-			value->valueType = 0;
-			value->nValue = lNum >= rNum;
+			*result = lNum >= rNum;
 	}
 	else if(node->oper == _OPER_SE) {
-			value->valueType = 0;
-			value->nValue = 0;
 			if(val_l.valueType != 1) return -1;
 			if(val_r.valueType != 1) return -1;
-			value->nValue = strcmp(val_l.pValue, val_r.pValue) == 0;
+			*result = strcmp(val_l.pValue, val_r.pValue) == 0;
 	}
 	else if(node->oper == _OPER_SNE) {
-			value->valueType = 0;
-			value->nValue = 0;
 			if(val_l.valueType != 1) return -1;
 			if(val_r.valueType != 1) return -1;
-			value->nValue = strcmp(val_l.pValue, val_r.pValue) != 0;
+			*result = strcmp(val_l.pValue, val_r.pValue) != 0;
 	}
 	else if(node->oper == _OPER_CE) {
-			value->valueType = 0;
-			value->nValue = 0;
 			if(val_l.valueType != 1) return -1;
 			if(val_r.valueType != 1) return -1;
-			value->nValue = strcmp(val_l.pValue, val_r.pValue) == 0;
+			*result = strcmp(val_l.pValue, val_r.pValue) == 0;
 	}
 	else if(node->oper == _OPER_CNE) {
-			value->valueType = 0;
-			value->nValue = 0;
 			if(val_l.valueType != 1) return -1;
 			if(val_r.valueType != 1) return -1;
-			value->nValue = strcmp(val_l.pValue, val_r.pValue) != 0;
+			*result = strcmp(val_l.pValue, val_r.pValue) != 0;
 	}
 	else if(node->oper == _OPER_AND) {
 			int64_t lNum = _get_number_value(&val_l);
 			int64_t rNum = _get_number_value(&val_r);
-			value->valueType = 0;
-			value->nValue = lNum && rNum;
+			*result = lNum && rNum;
 	}
 	else if(node->oper == _OPER_OR) {
 			int64_t lNum = _get_number_value(&val_l);
 			int64_t rNum = _get_number_value(&val_r);
-			value->valueType = 0;
-			value->nValue = lNum || rNum;
+			*result = lNum || rNum;
 	}
 	else if(node->oper == _OPER_NOT) {
 			int64_t rNum = _get_number_value(&val_r);
-			value->valueType = 0;
-			value->nValue = ! rNum;
+			*result = ! rNum;
 	}
 	else {
 		return -1;
@@ -747,17 +709,7 @@ static int _execute_oper_node(expr_node_t *node, expr_value *value, expr_value_g
 }
 
 int expr_parser_execute(expr_parser *parser, int *result, expr_value_getter getter) {
-	if(parser->root) {
-		if(parser->root->type == EXPR_NODE_OPER) {
-			expr_value val;
-			if(_execute_oper_node(parser->root, &val, getter) < 0) {
-				return -1;
-			}
-			*result = val.nValue;
-			return 0;
-		}
-		return -1;
-	}
-
-	return -1;
+	if(!parser->root) return -1;
+	if(parser->root->type != _NODE_OPER) return -1;
+	return _execute_oper_node(parser->root, result, getter);
 }

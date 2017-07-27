@@ -242,6 +242,14 @@ static inline  int _is_varname_char(char c) {
 	return ( isalpha(c) || isdigit(c) || c == '_' || c == '.' || c == '[' || c == ']');
 }
 
+static inline int _is_number_start(char c) {
+	return isdigit(c) || c == '.' || c == '-' || c == '+';
+}
+
+static inline int _is_number_char(char c) {
+	return isdigit(c) || c == '.';
+}
+
 static expr_node_t * _pick_data(char *exp_str, int *cursor) 
 {
 	if(exp_str[*cursor] == '\0') {
@@ -249,32 +257,35 @@ static expr_node_t * _pick_data(char *exp_str, int *cursor)
 	}
 	int start = -1;
 	int end = -1;
-	if(exp_str[*cursor] == '\"') {
+	if(exp_str[*cursor] == '\"') {	/* "字符串开始 */
 		start = *cursor;
 		end = *cursor+1;
 		while(exp_str[end] != 0 && exp_str[end] != '\"')	{ end++;}
 		if(exp_str[end] == '\"') end++;
 	}
-	else if(exp_str[*cursor] == '\'') {
+	else if(exp_str[*cursor] == '\'') {	/* '字符串开始 */
 		start = *cursor;
 		end = *cursor+1;
 		while(exp_str[end] != 0 && exp_str[end] != '\'')	{ end++;}
 		if(exp_str[end] == '\'') end++;
 	}
-	else if(strncmp(exp_str+*cursor, "[[", 2) == 0) {
+	else if(strncmp(exp_str+*cursor, "[[", 2) == 0) {	/* [[字符串开始 */
 		start = *cursor;
-		end = *cursor+1;
-		while(exp_str[end] != 0 && exp_str[end] != ']' &&exp_str[end-1] != ']')	{ end++;}
+		end = *cursor+2;
+		while(exp_str[end] != '\0' && (exp_str[end] != ']' || exp_str[end-1] != ']'))	{ end++;}
 		if(exp_str[end] == ']') end++;
 	}
-	else if(strncmp(exp_str+*cursor, "$", 1) == 0) 
-	{
+	else if(strncmp(exp_str+*cursor, "$", 1) == 0) {	/* $引用变量 */
 		start = *cursor;
-		end = *cursor+3;
+		end = *cursor+1;
 		while(_is_varname_char(exp_str[end])) {end++;}
 	}
-	else if(_is_varname_char(exp_str[*cursor]))
-	{
+	else if(_is_number_start(exp_str[*cursor])) {
+		start = *cursor;
+		end = *cursor + 1;
+		while(_is_number_char(exp_str[end])) {end++;}
+	}
+	else if(_is_varname_char(exp_str[*cursor])) {
 		start = *cursor;
 		end = *cursor + 1;
 		while(_is_varname_char(exp_str[end])) {end++;}
@@ -564,6 +575,14 @@ void expr_parser_parse(expr_parser * parser, char *exp_str) {
 		parser->root = _parse_it(exp_str, &parser->_stack1);
 	}
 }
+
+typedef struct _expr_value {
+	int valueType;  // 0- 数字 1-字符串
+	union {
+		int64_t nValue;
+		char *pValue;
+	};
+} expr_value;
 
 static int _execute_data_node(expr_node_t *node, expr_value * value, expr_value_getter getter) {
 	if(strncmp(node->data, "$", 1) == 0) {

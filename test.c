@@ -10,7 +10,7 @@ int get_value(char *valname, char **value) {
 int main()
 {
 	expr_parser * parser = expr_parser_new();
-	expr_parser_parse(parser, (char *)"a==$b.a[5]||\"hello_c\"<d&&(e>=f)||!\"world_c\"");
+	expr_parser_parse(parser, (char *)"[[a]]==$b.a[5]||\"hello_c\"<$d&&(e>=15.6)||!\'world_c\'");
 	//expr_parser_parse(parser, (char*)"id:aa-sne15 ");
 	//expr_node_t *node = parser->root;
 	//if(node == NULL)

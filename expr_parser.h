@@ -6,17 +6,8 @@
 #include <ctype.h>
 #include <stdint.h>
 
-
-
 typedef struct expr_parser expr_parser;
 
-typedef struct _expr_value {
-	int valueType;  // 0- 数字 1-字符串
-	union {
-		int64_t nValue;
-		char *pValue;
-	};
-} expr_value;
 
 typedef int (*expr_value_getter)(char * varname, char ** value);
 

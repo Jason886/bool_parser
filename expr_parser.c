@@ -5,50 +5,58 @@
 #include <memory.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <assert.h>
 
 /*
  * 运算符枚举
  */
-static const int _OPER_EQ		= 0;	// ==	, 数字相等
-static const int _OPER_NE		= 1;	// !=	, 数字不等
-static const int _OPER_LT		= 2;	// <	, 数字小于
-static const int _OPER_LE		= 3;	// >=	, 数字小于等于
-static const int _OPER_GT		= 4;	// >	, 数字大于
-static const int _OPER_GE		= 5;	// >=	, 数字大于等于
-static const int _OPER_SE		= 6;	// -se	, 字符串相等
-static const int _OPER_SNE		= 7;	// -sne	, 字符串不等
-static const int _OPER_CE		= 8;	// -ce	, 字符串相等（忽略大小写）
-static const int _OPER_CNE		= 9;	// -cne	, 字符串不等（忽略大小写）
-static const int _OPER_AND		= 10;	// &&	, 逻辑与
-static const int _OPER_OR		= 11;	// ||	, 逻辑或
-static const int _OPER_NOT		= 12;	// !	, 逻辑非
-static const int _OPER_BRK_L	= 13;	// (	, 左括号
-static const int _OPER_BRK_R	= 14;	// )	, 右括号
+#define _OPER_EQ	0	// ==	, 数字相等
+#define _OPER_NE	1	// !=	, 数字不等
+#define _OPER_LT	2	// <	, 数字小于
+#define _OPER_LE	3	// >=	, 数字小于等于
+#define _OPER_GT	4	// >	, 数字大于
+#define _OPER_GE	5	// >=	, 数字大于等于
+#define _OPER_SE	6	// -se	, 字符串相等
+#define _OPER_SNE	7	// -sne	, 字符串不等
+#define _OPER_CE	8	// -ce	, 字符串相等（忽略大小写）
+#define _OPER_CNE	9	// -cne	, 字符串不等（忽略大小写）
+#define _OPER_AND	10	// &&	, 逻辑与
+#define _OPER_OR	11	// ||	, 逻辑或
+#define _OPER_NOT	12	// !	, 逻辑非
+#define _OPER_BRK_L	13	// (	, 左括号
+#define _OPER_BRK_R	14	// )	, 右括号
 
 /*
  * 运算符
  */
-static const char * _TEXT_EQ	= "==";
-static const char * _TEXT_NE	= "!=";
-static const char * _TEXT_LT	= "<";
-static const char * _TEXT_LE	= "<=";
-static const char * _TEXT_GT	= ">";
-static const char * _TEXT_GE	= ">=";
-static const char * _TEXT_SE	= "-se";
-static const char * _TEXT_SNE	= "-sne";
-static const char * _TEXT_CE	= "-ce";
-static const char * _TEXT_CNE	= "-cne";
-static const char * _TEXT_AND	= "&&";
-static const char * _TEXT_OR	= "||";
-static const char * _TEXT_NOT	= "!";
-static const char * _TEXT_BRK_L	= "(";
-static const char * _TEXT_BRK_R	= ")";
+#define _TEXT_EQ	"=="
+#define _TEXT_NE	"!="
+#define _TEXT_LT	"<"
+#define _TEXT_LE	"<="
+#define _TEXT_GT	">"
+#define _TEXT_GE	">="
+#define _TEXT_SE	"-se"
+#define _TEXT_SNE	"-sne"
+#define _TEXT_CE	"-ce"
+#define _TEXT_CNE	"-cne"
+#define _TEXT_AND	"&&"
+#define _TEXT_OR	"||"
+#define _TEXT_NOT	"!"
+#define _TEXT_BRK_L	"("
+#define _TEXT_BRK_R	")"
 
 /*
- * 语法树节点类型
+ * 数据类型
  */
-static const int _NODE_OPER		= 0;
-static const int _NODE_DATA		= 1;
+#define _DATA_TYPE_INT 0
+#define _DATA_TYPE_DOUBLE 1
+#define _DATA_TYPE_STR 2
+
+/*
+ * 节点类型
+ */
+#define _NODE_TYPE_OPER	0
+#define _NODE_TYPE_DATA	1
 
 /*
  * 运算符配置
@@ -76,13 +84,23 @@ typedef struct _expr_node_t {
 	struct _expr_node_t * right;
 } expr_node_t;
 
-/*
- * 解析器
- */
 struct expr_parser {
 	struct _expr_node_t * root;
-	array_t _stack1;
+	array_t _ndstack;
 };
+
+struct expr_value_t{
+	int type;
+	union {
+		int64_t n;
+		double d;
+		struct {
+			char * p;
+			size_t size;
+		};
+	};
+};
+
 
 ARRAY_DEFINE(opercfg_t, opercfg)
 ARRAY_DEFINE(expr_node_t *, node)
@@ -117,14 +135,16 @@ static int _cmp_oper_len(const void *a, const void *b) {
 
 static expr_node_t * _new_node(int type) {
 	expr_node_t * node = (expr_node_t *) malloc(sizeof(expr_node_t));
-	memset(node, 0x00, sizeof(expr_node_t));
-	node->type = type;
+	if(node) {
+		memset(node, 0x00, sizeof(expr_node_t));
+		node->type = type;
+	}
 	return node;
 }
 
 static void _free_node(expr_node_t *node) {
 	if(0 != node) {
-		if(_NODE_DATA == node->type) {
+		if(_NODE_TYPE_DATA == node->type) {
 			if(0 != node->data) {
 				free(node->data);
 			}
@@ -148,7 +168,7 @@ static void _output_node(expr_node_t * node) {
 		_output_node(node->right);
 	}
 
-	if(node->type == _NODE_OPER) {
+	if(node->type == _NODE_TYPE_OPER) {
 		opercfg_t * cfg = _opercfg_of(node->oper);
 		printf("%s, ", cfg->text);
 	}
@@ -197,9 +217,9 @@ expr_parser * expr_parser_new() {
 	}
 
 	expr_parser * parser = (expr_parser*) malloc(sizeof(expr_parser));
-	memset(parser, 0x00, sizeof(expr_parser));
 	if(parser) {
-		node_array_init(&(parser->_stack1));
+		memset(parser, 0x00, sizeof(expr_parser));
+		node_array_init(&(parser->_ndstack));
 	}
 
 	return parser;
@@ -207,7 +227,7 @@ expr_parser * expr_parser_new() {
 
 void expr_parser_delete(expr_parser *parser) {
 	if(parser) {
-		_clear_stack(&(parser->_stack1));
+		_clear_stack(&(parser->_ndstack));
 		free(parser);
 	}
 }
@@ -222,10 +242,12 @@ expr_node_t * _pick_oper(char * exp_str, int * cursor) {
 		array_at(&_opercfgs, i, (void *)&cfg); 
 		int len = strlen(cfg.text);
 		if(strncmp(exp_str + (*cursor), cfg.text, len) == 0) {
-			expr_node_t *node = _new_node(_NODE_OPER);
-			node->oper = cfg.oper;
-			node->left=0;
-			node->right=0;
+			expr_node_t *node = _new_node(_NODE_TYPE_OPER);
+			if(node) {
+				node->oper = cfg.oper;
+				node->left=0;
+				node->right=0;
+			}
 			(*cursor) += len;
 			printf("oper: %s end: %d\n", cfg.text, (*cursor));
 			return node;
@@ -254,17 +276,11 @@ static expr_node_t * _pick_data(char *exp_str, int *cursor)
 	}
 	int start = -1;
 	int end = -1;
-	if(exp_str[*cursor] == '\"') {	/* "字符串开始 */
+	if(exp_str[*cursor] == '\"' || exp_str[*cursor] == '\'') {	/* "字符串开始 */
 		start = *cursor;
 		end = *cursor+1;
-		while(exp_str[end] != 0 && exp_str[end] != '\"')	{ end++;}
-		if(exp_str[end] == '\"') end++;
-	}
-	else if(exp_str[*cursor] == '\'') {	/* '字符串开始 */
-		start = *cursor;
-		end = *cursor+1;
-		while(exp_str[end] != 0 && exp_str[end] != '\'')	{ end++;}
-		if(exp_str[end] == '\'') end++;
+		while(exp_str[end] != 0 && exp_str[end] != exp_str[*cursor])	{ end++;}
+		if(exp_str[end] == exp_str[*cursor]) end++;
 	}
 	else if(strncmp(exp_str+*cursor, "[[", 2) == 0) {	/* [[字符串开始 */
 		start = *cursor;
@@ -291,16 +307,20 @@ static expr_node_t * _pick_data(char *exp_str, int *cursor)
 		return 0;
 	}
 
-	char *data_tmp = (char *)malloc(end-start+1);
-	memset(data_tmp, 0x00, end-start+1);
-	memcpy(data_tmp, exp_str+start, end-start);
+	char *data = (char *)malloc(end-start+1);
+	if(data) {
+		memset(data, 0x00, end-start+1);
+		memcpy(data, exp_str+start, end-start);
+	}
 
-	expr_node_t * node = _new_node(_NODE_DATA);
-	node->data = data_tmp;
-	node->left = 0;
-	node->right = 0;
+	expr_node_t * node = _new_node(_NODE_TYPE_DATA);
+	if(node) {
+		node->data = data;
+		node->left = 0;
+		node->right = 0;
+	}
 
-	printf("data:%s end:%d\n", data_tmp, end);
+	printf("data:%s end:%d\n", data, end);
 
 	*cursor = end;
 	return node;
@@ -318,22 +338,20 @@ static void _slip_space(char *exp_str, int *cursor) {
 static expr_node_t * _get_next_node(char *exp_str, int *cursor) {
 	_slip_space(exp_str, cursor);
 	expr_node_t * node = _pick_oper(exp_str, cursor);
-	if(node) {
-		return node;
-	}
+	if(node) { return node; }
 	_slip_space(exp_str, cursor);
 	node = _pick_data(exp_str, cursor);
 	return node;
 }
 
-static void _get_pre_oper(array_t * stack1, expr_node_t ** pre_oper, size_t *oper_idx) {
-	size_t idx = array_size(stack1);
+static void _get_pre_oper(array_t * ndstack, expr_node_t ** pre_oper, size_t *oper_idx) {
+	size_t idx = array_size(ndstack);
 	while(idx > 0) {
 		idx --;
 		expr_node_t *node = 0;
-		array_at(stack1, idx, &node);
+		array_at(ndstack, idx, &node);
 		if(node) {
-			if(_NODE_OPER == node->type) {
+			if(_NODE_TYPE_OPER == node->type) {
 				if(_OPER_BRK_L == node->oper) {
 					*pre_oper = node;
 					*oper_idx = idx;
@@ -351,13 +369,13 @@ static void _get_pre_oper(array_t * stack1, expr_node_t ** pre_oper, size_t *ope
 	return;
 }
 
-static int _deal_brk_r(array_t * stack1, expr_node_t * brk_node) {
+static int _deal_brk_r(array_t * ndstack, expr_node_t * brk_node) {
 	while(1) {
 		expr_node_t * pre_oper = 0;
 		size_t pre_oper_idx = 0;
-		_get_pre_oper(stack1, &pre_oper, &pre_oper_idx);
+		_get_pre_oper(ndstack, &pre_oper, &pre_oper_idx);
 		if(0 == pre_oper) {
-			if(array_size(stack1) > 1) {
+			if(array_size(ndstack) > 1) {
 				// error
 				printf("error at:%lu unmatch ^) \n", brk_node->offset);
 				return -1;
@@ -365,42 +383,42 @@ static int _deal_brk_r(array_t * stack1, expr_node_t * brk_node) {
 			return 0;
 		}
 		if(_OPER_BRK_L == pre_oper->oper) {
-			if(array_size(stack1)-pre_oper_idx > 2) {
+			if(array_size(ndstack)-pre_oper_idx > 2) {
 				// error
 				printf("error at:%lu more than 1 param in ^()\n", pre_oper->offset);
 				return -1;
 			}
 			_free_node(pre_oper);
-			array_erase(stack1, pre_oper_idx);
+			array_erase(ndstack, pre_oper_idx);
 			return 0;
 		}
 
-		if(array_size(stack1)-pre_oper_idx<=1) {
+		if(array_size(ndstack)-pre_oper_idx<=1) {
 			// error
 			opercfg_t * cfg = _opercfg_of(pre_oper->oper);
 			printf("error at:%lu need param after ^%s\n", pre_oper->offset, cfg->text);
 			return -1;
 		}
 		expr_node_t * right = 0;
-		array_at(stack1, pre_oper_idx +1, &right);
+		array_at(ndstack, pre_oper_idx +1, &right);
 		pre_oper->right = right;
-		array_erase(stack1, pre_oper_idx+1);
+		array_erase(ndstack, pre_oper_idx+1);
 		continue;
 	}
 }
 
-static int _link_left(array_t* stack1, expr_node_t * link_node, size_t idx) {
+static int _link_left(array_t* ndstack, expr_node_t * link_node, size_t idx) {
 	if(idx == -1) {
 		opercfg_t * cfg = _opercfg_of(link_node->oper);
 		if(cfg->need_left) {
-			if(array_size(stack1) == 0) {
+			if(array_size(ndstack) == 0) {
 				// error
 				printf("error at:%lu need param before ^%s\n", link_node->offset, cfg->text);
 				return -1;
 			}
 			expr_node_t *left = 0;
-			array_at(stack1, array_size(stack1)-1, &left);
-			if(_NODE_OPER == left->type) {
+			array_at(ndstack, array_size(ndstack)-1, &left);
+			if(_NODE_TYPE_OPER == left->type) {
 				opercfg_t * leftcfg = _opercfg_of(left->oper);
 				if(leftcfg->need_right && 0 == left->right) {
 					// error
@@ -409,7 +427,7 @@ static int _link_left(array_t* stack1, expr_node_t * link_node, size_t idx) {
 				}
 			}
 			link_node->left = left;
-			array_erase(stack1, array_size(stack1)-1);
+			array_erase(ndstack, array_size(ndstack)-1);
 			return 0;
 		}
 		return 0;
@@ -417,65 +435,65 @@ static int _link_left(array_t* stack1, expr_node_t * link_node, size_t idx) {
 	return 0;
 }
 
-static int _link_right(array_t* stack1, expr_node_t * link_node, size_t idx) {
+static int _link_right(array_t* ndstack, expr_node_t * link_node, size_t idx) {
 	opercfg_t * cfg = _opercfg_of(link_node->oper);
 	if(cfg->need_right) {
-		if(idx == array_size(stack1) -1) {
+		if(idx == array_size(ndstack) -1) {
 			// error
 			printf("error at:%lu need param after ^%s\n", link_node->offset, cfg->text);
 			return -1;
 		}
 		expr_node_t *right = 0;
-		array_at(stack1, idx+1, &right);
+		array_at(ndstack, idx+1, &right);
 		link_node->right = right;
-		array_erase(stack1, idx+1);
+		array_erase(ndstack, idx+1);
 		return 0;
 	}
 	return 0;
 }
 
-static int _deal_oper_node(array_t * stack1, expr_node_t * oper_node) {
+static int _deal_oper_node(array_t * ndstack, expr_node_t * oper_node) {
 	opercfg_t * curcfg = _opercfg_of(oper_node->oper);
 	while(1) {
 		expr_node_t * pre_oper = 0;
 		size_t pre_oper_idx = 0;
-		_get_pre_oper(stack1, &pre_oper, &pre_oper_idx);
+		_get_pre_oper(ndstack, &pre_oper, &pre_oper_idx);
 		if(0 == pre_oper || _OPER_BRK_L == pre_oper->oper) {
-			if(_link_left(stack1, oper_node, -1) < 0) {
+			if(_link_left(ndstack, oper_node, -1) < 0) {
 				return -1;
 			}
-			node_array_push_back(stack1, oper_node);
+			node_array_push_back(ndstack, oper_node);
 			return 0;
 		}
 
 		if(!curcfg->need_left) {
-			node_array_push_back(stack1, oper_node);
+			node_array_push_back(ndstack, oper_node);
 			return 0;
 		}
 		
 		opercfg_t *precfg = _opercfg_of(pre_oper->oper);
 		if(precfg->priority_r >= curcfg->priority_r) {
-			if(_link_right(stack1, pre_oper, pre_oper_idx) < 0) {
+			if(_link_right(ndstack, pre_oper, pre_oper_idx) < 0) {
 				return -1;
 			}
 			continue;
 		}
 
-		if( _link_left(stack1, oper_node, -1) < 0) {
+		if( _link_left(ndstack, oper_node, -1) < 0) {
 			return -1;
 		}
-		node_array_push_back(stack1, oper_node);
+		node_array_push_back(ndstack, oper_node);
 		return 0;
 	}
 }
 
-static int _deal_end(array_t * stack1) {
+static int _deal_end(array_t * ndstack) {
 	while(1) {
 		expr_node_t * pre_oper = 0;
 		size_t pre_oper_idx = 0;
-		_get_pre_oper(stack1, &pre_oper, &pre_oper_idx);
+		_get_pre_oper(ndstack, &pre_oper, &pre_oper_idx);
 		if(0 == pre_oper) {
-			size_t size = array_size(stack1);
+			size_t size = array_size(ndstack);
 			if(size > 1) {
 				// error
 				printf("error: too many values. \n");
@@ -495,7 +513,7 @@ static int _deal_end(array_t * stack1) {
 			return -1;
 		}
 
-		size_t size = array_size(stack1);
+		size_t size = array_size(ndstack);
 
 		if(size-pre_oper_idx<=1) {
 			// error
@@ -504,48 +522,45 @@ static int _deal_end(array_t * stack1) {
 			return -1;
 		}
 		expr_node_t * right = 0;
-		array_at(stack1, pre_oper_idx +1, &right);
-		array_erase(stack1, pre_oper_idx+1);
+		array_at(ndstack, pre_oper_idx +1, &right);
+		array_erase(ndstack, pre_oper_idx+1);
 		pre_oper->right = right;
 		continue;
 	}
 }
 
-static expr_node_t * _parse_it(char *exp_str, array_t * stack1) {
-	_clear_stack(stack1);
+static expr_node_t * _parse_it(char *exp_str, array_t * ndstack) {
 
+	_clear_stack(ndstack);
 	int cursor = 0;
-
 	while(1) {
 		expr_node_t * node = _get_next_node(exp_str, &cursor);
 		if(!node) {
 			if(exp_str[cursor] != '\0') {
 				// error
 				printf("error at:%d, unrecognized character:^%c\n", cursor, exp_str[cursor]);
-				_clear_stack(stack1);
+				_clear_stack(ndstack);
 				return 0;
 			}
 
-			if(_deal_end(stack1) < 0) {
-				return 0;
-			}
+			if(_deal_end(ndstack) < 0) { return 0; }
 
 			expr_node_t * ret = 0;
-			array_at(stack1, 0, &ret);
+			array_at(ndstack, 0, &ret);
 			return ret;
 		}
 
-		if(node->type == _NODE_DATA) {
-			node_array_push_back(stack1, node);
+		if(node->type == _NODE_TYPE_DATA) {
+			node_array_push_back(ndstack, node);
 			continue;
 		}
-		if(node->type == _NODE_OPER) {
+		if(node->type == _NODE_TYPE_OPER) {
 			if(_OPER_BRK_L == node->oper) {
-				node_array_push_back(stack1, node);
+				node_array_push_back(ndstack, node);
 				continue;
 			}
 			if(_OPER_BRK_R == node->oper) {
-				if(_deal_brk_r(stack1, node) < 0) {
+				if(_deal_brk_r(ndstack, node) < 0) {
 					_free_node(node);
 					return 0;
 				}
@@ -553,7 +568,7 @@ static expr_node_t * _parse_it(char *exp_str, array_t * stack1) {
 				continue;
 			}
 
-			if(_deal_oper_node(stack1, node) < 0) {
+			if(_deal_oper_node(ndstack, node) < 0) {
 				_free_node(node);
 				return 0;
 			}
@@ -563,7 +578,7 @@ static expr_node_t * _parse_it(char *exp_str, array_t * stack1) {
 
 void expr_parser_reset(expr_parser *parser) {
 	if(parser) {
-		_clear_stack(&parser->_stack1);
+		_clear_stack(&parser->_ndstack);
 		parser->root = 0;
 	}
 }
@@ -571,172 +586,271 @@ void expr_parser_reset(expr_parser *parser) {
 void expr_parser_parse(expr_parser * parser, char *exp_str) {
 	if(parser) {
 		expr_parser_reset(parser);
-		parser->root = _parse_it(exp_str, &parser->_stack1);
+		parser->root = _parse_it(exp_str, &parser->_ndstack);
 	}
 }
 
-typedef struct _expr_value {
-	int valueType;  // 0- 数字 1-字符串
-	union {
-		int64_t nValue;
-		char *pValue;
-	};
-} expr_value;
-
-static int _execute_data_node(expr_node_t *node, expr_value * value, expr_value_getter getter) {
+static int _execute_data_node(expr_node_t *node, expr_value_t * value, expr_value_getter getter) {
 	if(strncmp(node->data, "$", 1) == 0) {
-		char *data = 0;
-		if(getter((char *)node->data+1, &data) < 0) {
+		if(getter((char *)node->data+1, value) < 0) {
 			return -1;
 		}
-		value->valueType = 1;
-		value->pValue = data;
 		return 0;
 	}
 	else {
-		value->valueType = 1;
-		value->pValue = node->data;
+		if(node->data[0] == '\'' || node->data[0] == '\"') {
+			int end = strlen(node->data);
+			if(node->data[end-1] == node->data[0]) {
+				end--;
+			}
+			char varname[1024] = {0};
+			if(end-1 > 0) { 
+				memcpy(varname, node->data+1, end-1);
+			}
+			expr_value_set_str(value, varname, strlen(varname));
+		}
+		else if(strncmp(node->data, "[[", 2) == 0) {
+			int end = strlen(node->data);
+			if(strncmp(node->data + end -2, "]]", 2) == 0) {
+				end-=2;
+			}
+			char varname[1024] = {0};
+			if(end-2>0) {
+				memcpy(varname, node->data+2, end-2);
+			}
+			expr_value_set_str(value, varname, strlen(varname));
+		}
+		else if(strcmp(node->data, "true") == 0) {
+			expr_value_set_int(value, 1);
+		}
+		else if(strcmp(node->data, "false") == 0) {
+			expr_value_set_int(value, 0);
+		}
+		else {
+			int isnumber = 1;
+			int dotpos = -1;
+			if(node->data[0] == '.') dotpos = 0;
+			if(!_is_number_start(node->data[0])) {
+				isnumber = 0;
+			}
+			if(isnumber) {
+				int i = 1;
+				while(i<strlen(node->data)) {
+					if(dotpos == -1) {
+						if(node->data[i] == '.') dotpos = i;
+					}
+					if(!_is_number_char(node->data[i])) {
+						isnumber = 0;
+						break;
+					}
+				}
+			}
+
+			if(isnumber) {
+				if(dotpos != -1 && dotpos != strlen(node->data) -1) {
+					double d = atof(node->data);
+					expr_value_set_double(value, d);
+				}
+				else {
+					int n = atoi(node->data);
+					expr_value_set_int(value, n);
+				}
+			}
+			else {
+				if(getter((char *)node->data, value) < 0) {
+					return -1;
+				}
+			}
+		}
+
 		return 0;
 	}
 }
 
-static int64_t _get_number_value(expr_value * v) {
-	int64_t vv = v->nValue;
-	if(v->valueType == 1) {
-		if(!v->pValue) {
-			vv = 0;
-		}
-		else if(strcmp(v->pValue, "true") == 0) {
-			vv = 1;
-		}
-		else if(strcmp(v->pValue, "false") == 0) {
-			vv = 0;
-		}
-		else {
-			vv = atoi(v->pValue); 
-		}
+static int _get_number_value(expr_value_t * value, double *number) {
+	assert(value);
+	assert(number);
+	if(value->type == _DATA_TYPE_INT) {
+		*number = (double) value->n;
+		return 0;
 	}
-	return vv;
+	else if(value->type == _DATA_TYPE_DOUBLE) {
+		*number = value->d;
+		return 0;
+	}
+	return -1;
 }
 
-static int _execute_oper_node(expr_node_t *node, int * result, expr_value_getter getter) {
+static int _execute_oper_node(expr_node_t *node, expr_value_t * value, expr_value_getter getter) {
+	assert(node);
+	assert(value);
+
+	int ret = -1;
+	expr_value_t val_l = {0}, val_r = {0};
+
+	expr_node_t * left = node->left, * right = node->right;
 	opercfg_t * cfg = _opercfg_of(node->oper);
-	expr_node_t * left = node->left;
-	expr_node_t *right = node->right;
-	expr_value val_l, val_r;
 	if(cfg->need_left) {
-		if(_NODE_OPER == left->type) {
-			int lVal = 0;
-			if(_execute_oper_node(left, &lVal, getter) < 0) {
-				return -1;
-			}
-			val_l.valueType = 0;
-			val_l.nValue = lVal;
+		if(_NODE_TYPE_OPER == left->type) {
+			if(_execute_oper_node(left, &val_l, getter) < 0) { goto ERROR_RET; }
 		}
 		else {
-			if(_execute_data_node(left, &val_l, getter) < 0) {
-				return -1;
-			}
+			if(_execute_data_node(left, &val_l, getter) < 0) { goto ERROR_RET; }
 		} 
 	}
 	if(cfg->need_right) {
-		if(_NODE_OPER == right->type) {
-			int rVal = 0;
-			if(_execute_oper_node(right, &rVal, getter) < 0) {
-				return -1;
-			}
-			val_r.valueType = 0;
-			val_r.nValue = rVal;
+		if(_NODE_TYPE_OPER == right->type) {
+			if(_execute_oper_node(right, &val_r, getter) < 0) { goto ERROR_RET; }
 		}
 		else {
-			if(_execute_data_node(right, &val_r, getter) < 0) {
-				return -1;
-			}
+			if(_execute_data_node(right, &val_r, getter) < 0) { goto ERROR_RET; }
 		} 
 	}
 
 	if(node->oper == _OPER_EQ) {
-			int64_t lNum = _get_number_value(&val_l);
-			int64_t rNum = _get_number_value(&val_r);
-			*result = lNum == rNum;
+		double l = 0, r = 0;
+		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		expr_value_set_int(value, l == r);
 	}
 	else if(node->oper == _OPER_NE) {
-			int64_t lNum = _get_number_value(&val_l);
-			int64_t rNum = _get_number_value(&val_r);
-			*result = lNum != rNum;
+		double l = 0, r = 0;
+		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		expr_value_set_int(value, l != r);
 	}
 	else if(node->oper == _OPER_LT) {
-			int64_t lNum = _get_number_value(&val_l);
-			int64_t rNum = _get_number_value(&val_r);
-			*result = lNum < rNum;
+		double l = 0, r = 0;
+		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		expr_value_set_int(value, l < r);
 	}
 	else if(node->oper == _OPER_LE) {
-			int64_t lNum = _get_number_value(&val_l);
-			int64_t rNum = _get_number_value(&val_r);
-			*result = lNum <= rNum;
+		double l = 0, r = 0;
+		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		expr_value_set_int(value, l <= r);
 	}
 	else if(node->oper == _OPER_GT) {
-			int64_t lNum = _get_number_value(&val_l);
-			int64_t rNum = _get_number_value(&val_r);
-			*result = lNum > rNum;
+		double l = 0, r = 0;
+		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		expr_value_set_int(value, l > r);
 	}
 	else if(node->oper == _OPER_GE) {
-			int64_t lNum = _get_number_value(&val_l);
-			int64_t rNum = _get_number_value(&val_r);
-			*result = lNum >= rNum;
+		double l = 0, r = 0;
+		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		expr_value_set_int(value, l >= r);
 	}
 	else if(node->oper == _OPER_SE) {
-			if(val_l.valueType != 1) return -1;
-			if(val_r.valueType != 1) return -1;
-			*result = strcmp(val_l.pValue, val_r.pValue) == 0;
+		if(val_l.type != _DATA_TYPE_STR) goto ERROR_RET;
+		if(val_r.type != _DATA_TYPE_STR) goto ERROR_RET;
+		expr_value_set_int(value, strcmp(val_l.p, val_r.p) == 0);
 	}
 	else if(node->oper == _OPER_SNE) {
-			if(val_l.valueType != 1) return -1;
-			if(val_r.valueType != 1) return -1;
-			*result = strcmp(val_l.pValue, val_r.pValue) != 0;
+		if(val_l.type != _DATA_TYPE_STR) goto ERROR_RET;
+		if(val_r.type != _DATA_TYPE_STR) goto ERROR_RET;
+		expr_value_set_int(value, strcmp(val_l.p, val_r.p) != 0);
 	}
 	else if(node->oper == _OPER_CE) {
-			if(val_l.valueType != 1) return -1;
-			if(val_r.valueType != 1) return -1;
-			*result = strcmp(val_l.pValue, val_r.pValue) == 0;
+		// !!! 忽略大小写
+		if(val_l.type != _DATA_TYPE_STR) goto ERROR_RET;
+		if(val_r.type != _DATA_TYPE_STR) goto ERROR_RET;
+		expr_value_set_int(value, strcmp(val_l.p, val_r.p) == 0);
 	}
 	else if(node->oper == _OPER_CNE) {
-			if(val_l.valueType != 1) return -1;
-			if(val_r.valueType != 1) return -1;
-			*result = strcmp(val_l.pValue, val_r.pValue) != 0;
+		// !!! 忽略大小写
+		if(val_l.type != _DATA_TYPE_STR) goto ERROR_RET;
+		if(val_r.type != _DATA_TYPE_STR) goto ERROR_RET;
+		expr_value_set_int(value, strcmp(val_l.p, val_r.p) != 0);
 	}
 	else if(node->oper == _OPER_AND) {
-			int64_t lNum = _get_number_value(&val_l);
-			int64_t rNum = _get_number_value(&val_r);
-			*result = lNum && rNum;
+		double l = 0, r = 0;
+		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		expr_value_set_int(value, l && r);
 	}
 	else if(node->oper == _OPER_OR) {
-			int64_t lNum = _get_number_value(&val_l);
-			int64_t rNum = _get_number_value(&val_r);
-			*result = lNum || rNum;
+		double l = 0, r = 0;
+		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		expr_value_set_int(value, l || r);
 	}
 	else if(node->oper == _OPER_NOT) {
-			int64_t rNum = _get_number_value(&val_r);
-			*result = ! rNum;
+		double r = 0;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		expr_value_set_int(value, !r);
 	}
 	else {
-		return -1;
+		goto ERROR_RET;
 	}
 
-	return 0;
+	ret = 0;
+ERROR_RET:
+	expr_value_clear(&val_l);
+	expr_value_clear(&val_r);
+	return ret;
 }
 
 int expr_parser_execute(expr_parser *parser, int *result, expr_value_getter getter) {
-	if(!parser->root) return -1;
-	if(parser->root->type != _NODE_OPER) return -1;
-	return _execute_oper_node(parser->root, result, getter);
+	assert(parser);
+	int ret = -1;
+	expr_value_t value = {0}; 
+	if(!parser->root) goto ERR_RET;
+	if(parser->root->type != _NODE_TYPE_OPER) goto ERR_RET; 
+	if(_execute_oper_node(parser->root, &value, getter) < 0) { goto ERR_RET; }
+	if(value.type != _DATA_TYPE_INT) { goto ERR_RET; }
+	*result = (int)value.n;
+
+	ret = 0;
+ERR_RET:
+	expr_value_clear(&value);
+	return 0;
 }
 
-
 void expr_parser_print_tree(expr_parser *parser) {
+	assert(parser);
 	if(parser) {
 		if(parser->root) {
 			_output_node(parser->root);
 		}
 	}
 }
+
+
+void expr_value_set_int(expr_value_t *value, int64_t n) {
+	assert(value);
+	value->type = _DATA_TYPE_INT;
+	value->n = n;
+}
+
+void expr_value_set_double(expr_value_t *value, double d) {
+	assert(value);
+	value->type = _DATA_TYPE_DOUBLE;
+	value->d = d;
+}
+
+void expr_value_set_str(expr_value_t *value, char *p, size_t size) {
+	assert(value);
+	memset(value, 0x00, sizeof(*value));
+	value->type = _DATA_TYPE_STR;
+	value->size = size;
+	value->p = (char *)malloc(size+1);
+	if(value->p) {
+		memset(value->p, 0x00, size+1);
+		if(p && size > 0) {
+			memcpy(value->p, p, size);
+		}
+	}
+}
+
+void expr_value_clear(expr_value_t * value) {
+	assert(value);
+	if(value->type == _DATA_TYPE_STR) {
+		if(value->p) {
+			free(value->p);
+		}
+	}
+}
+

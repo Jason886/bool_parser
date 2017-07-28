@@ -1,9 +1,22 @@
 #include "expr_parser.h"
+#include <stdlib.h>
+#include <assert.h>
 
-char value_str[128] = {'1','5','\0'};
-
-int get_value(char *valname, char **value) {
-	*value = value_str;
+int get_value(char *varname, expr_value_t * value) {
+	assert(varname);
+	assert(value);
+	if(strcmp(varname, "var_int") == 0) {
+		expr_value_set_int(value, 35);
+	}
+	if(strcmp(varname, "var_double") == 0) {
+		expr_value_set_double(value, 3.4);
+	}
+	if(strcmp(varname, "var_pchar") == 0) {
+		expr_value_set_str(value, "hello", strlen("hello"));
+	}
+	else {
+		return -1;
+	}
 	return 0;
 }
 

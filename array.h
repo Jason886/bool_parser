@@ -56,6 +56,8 @@ void array_foreach_reverse(array_t *arr, array_foreach_callback cb);
 (T e, array_at(arr, idx, &e), &e)
 #define arr_get_ref(T, arr, idx) \
 (T *pe =0, array_ref_at(arr, idx, &pe), pe)
+#define arr_set(arr, idx, e) \
+{} \
 #define arr_last(T, arr) \
 (T e, array_back(arr, &e), e)
 #define arr_last_ref(T, arr) \

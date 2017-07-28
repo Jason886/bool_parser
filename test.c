@@ -39,7 +39,7 @@ int get_value(char *varname, expr_value_t * value) {
 int main()
 {
 	expr_parser * parser = expr_parser_new();
-	expr_parser_parse(parser, (char *)"[[a]] -se $b.a[5]||hello_c<$d&&(e>=-179.4.)||!world_c");
+	expr_parser_parse(parser, (char *)"[[a]] > $b.a[5]||hello_c<$d&&(e>=-179.4.)||!world_c");
 	/*
 	expr_parser_parse(parser, (char*)"a > b && ! e");
 	expr_parser_parse(parser, (char *)"('hello'-sne \"hell\")");

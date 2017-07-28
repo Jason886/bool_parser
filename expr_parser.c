@@ -101,6 +101,9 @@ typedef struct _expr_node_t {
 struct expr_parser {
 	struct _expr_node_t * root;
 	array_t _ndstack;
+	/*
+	char err_text[256];
+	*/
 };
 
 struct expr_value_t{
@@ -266,6 +269,7 @@ expr_node_t * _pick_oper(char * exp_str, size_t * cursor) {
 				node->u.oper = cfg.oper;
 				node->left=0;
 				node->right=0;
+				node->offset = *cursor;
 			}
 			(*cursor) += len;
 			__expr_log_info("oper: %s end: %lu\n", cfg.text, (*cursor));
@@ -349,6 +353,7 @@ static expr_node_t * _pick_data(char *exp_str, size_t *cursor) {
 		node->u.data = data;
 		node->left = 0;
 		node->right = 0;
+		node->offset = *cursor;
 	}
 	
 	__expr_log_info("data:%s end:%d\n", data, end);
@@ -415,7 +420,7 @@ static int _deal_brk_r(array_t * ndstack, expr_node_t * brk_node) {
 		if(0 == pre_oper) {
 			if(array_size(ndstack) > 1) {
 				/* error */
-				printf("error expr_parser.c:%d, at exp_str:%lu unmatch ^) \n", __LINE__, brk_node->offset);
+				printf("[error] expr_parser.c:%d, at exp_str:%lu unmatch ^) \n", __LINE__, brk_node->offset);
 				return -1;
 			}
 			return 0;
@@ -423,7 +428,7 @@ static int _deal_brk_r(array_t * ndstack, expr_node_t * brk_node) {
 		if(_OPER_BRK_L == pre_oper->u.oper) {
 			if(array_size(ndstack)-pre_oper_idx > 2) {
 				/* error */
-				printf("error expr_parser.c:%d, at exp_str:%lu more than 1 param in ^()\n",__LINE__, pre_oper->offset);
+				printf("[error] expr_parser.c:%d, at exp_str:%lu more than 1 param in ^()\n",__LINE__, pre_oper->offset);
 				return -1;
 			}
 			_free_node(pre_oper);
@@ -434,7 +439,7 @@ static int _deal_brk_r(array_t * ndstack, expr_node_t * brk_node) {
 		if(array_size(ndstack)-pre_oper_idx<=1) {
 			/* error */
 			opercfg_t * cfg = _opercfg_of(pre_oper->u.oper);
-			printf("error expr_parser.c:%d, at exp_str:%lu need param after ^%s\n", __LINE__, pre_oper->offset, cfg->text);
+			printf("[error] expr_parser.c:%d, at exp_str:%lu need param after ^%s\n", __LINE__, pre_oper->offset, cfg->text);
 			return -1;
 		}
 		right = 0;
@@ -452,7 +457,7 @@ static int _link_left(array_t* ndstack, expr_node_t * link_node, size_t idx) {
 	if(cfg->need_left) {
 		if(array_size(ndstack) == 0) {
 			/* error */
-			printf("error expr_parser.c:%d, at exp_str:%lu need param before ^%s\n", __LINE__, link_node->offset, cfg->text);
+			printf("[error] expr_parser.c:%d, at exp_str:%lu need param before ^%s\n", __LINE__, link_node->offset, cfg->text);
 			return -1;
 		}
 		left = 0;
@@ -461,7 +466,7 @@ static int _link_left(array_t* ndstack, expr_node_t * link_node, size_t idx) {
 			opercfg_t * leftcfg = _opercfg_of(left->u.oper);
 			if(leftcfg->need_right && 0 == left->right) {
 				/* error */
-				printf("error expr_parser.c:%d, at exp_str:%lu need param before ^%s\n", __LINE__, link_node->offset, cfg->text);
+				printf("[error] expr_parser.c:%d, at exp_str:%lu need param before ^%s\n", __LINE__, link_node->offset, cfg->text);
 				return -1;
 			}
 		}
@@ -478,7 +483,7 @@ static int _link_right(array_t* ndstack, expr_node_t * link_node, size_t idx) {
 	if(cfg->need_right) {
 		if(idx == array_size(ndstack) -1) {
 			/* error */
-			printf("error expr_parser.c:%d, at exp_str:%lu need param after ^%s\n", __LINE__, link_node->offset, cfg->text);
+			printf("[error] expr_parser.c:%d, at exp_str:%lu need param after ^%s\n", __LINE__, link_node->offset, cfg->text);
 			return -1;
 		}
 		right = 0;
@@ -541,12 +546,12 @@ static int _deal_end(array_t * ndstack) {
 		if(0 == pre_oper) {
 			if(array_size(ndstack) > 1) {
 				/* error */
-				printf("error expr_parser.c:%d, too many values. \n", __LINE__);
+				printf("[error] expr_parser.c:%d, too many values. \n", __LINE__);
 				return -1;
 			}
 			if(array_size(ndstack) == 0) {
 				/* error */
-				printf("error expr_parser.c:%d, no value.\n", __LINE__);
+				printf("[error] expr_parser.c:%d, no value.\n", __LINE__);
 				return -1;
 			}
 			return 0;
@@ -554,14 +559,14 @@ static int _deal_end(array_t * ndstack) {
 		if(_OPER_BRK_L == pre_oper->u.oper) {
 			/* error */
 			opercfg_t * cfg = _opercfg_of(pre_oper->u.oper);
-			printf("error expr_parser.c:%d, at exp_str:%lu unmatch with ^%s\n", __LINE__, pre_oper->offset, cfg->text);
+			printf("[error] expr_parser.c:%d, at exp_str:%lu unmatch with ^%s\n", __LINE__, pre_oper->offset, cfg->text);
 			return -1;
 		}
 
 		if(array_size(ndstack)-pre_oper_idx<=1) {
 			/* error */
 			opercfg_t * cfg = _opercfg_of(pre_oper->u.oper);
-			printf("error expr_parser.c:%d, at exp_str:%lu need param after ^%s\n", __LINE__, pre_oper->offset, cfg->text);
+			printf("[error] expr_parser.c:%d, at exp_str:%lu need param after ^%s\n", __LINE__, pre_oper->offset, cfg->text);
 			return -1;
 		}
 		right = 0;
@@ -581,7 +586,7 @@ static expr_node_t * _parse_it(char *exp_str, array_t * ndstack) {
 		if(!node) {
 			if(exp_str[cursor] != '\0') {
 				/* error */
-				printf("error expr_parser.c:%d, at exp_str:%lu, unrecognized character:^%c\n", __LINE__, cursor, exp_str[cursor]);
+				printf("[error] expr_parser.c:%d, at exp_str:%lu, unrecognized character:^%c\n", __LINE__, cursor, exp_str[cursor]);
 				_clear_stack(ndstack);
 				return 0;
 			}
@@ -636,6 +641,7 @@ static int _execute_data_node(expr_node_t *node, expr_value_t * value, expr_valu
 	char varname[1024] = {0};
 	if(strncmp(node->u.data, "$", 1) == 0) {
 		if(getter((char *)node->u.data+1, value) < 0) {
+			printf("[error] expr_parser.c:%d, getter value error, varname=%s\n", __LINE__, node->u.data);
 			return -1;
 		}
 		return 0;
@@ -692,6 +698,7 @@ static int _execute_data_node(expr_node_t *node, expr_value_t * value, expr_valu
 			}
 			else {
 				if(getter((char *)node->u.data, value) < 0) {
+					printf("[error] expr_parser.c:%d, getter value error, varname=%s\n", __LINE__, node->u.data);
 					return -1;
 				}
 			}
@@ -747,77 +754,91 @@ static int _execute_oper_node(expr_node_t *node, expr_value_t * value, expr_valu
 	}
 
 	if(node->u.oper == _OPER_EQ) {
-		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET;
-		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET_L;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET_R;
 		expr_value_set_int(value, l == r);
 	}
 	else if(node->u.oper == _OPER_NE) {
-		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET;
-		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET_L;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET_R;
 		expr_value_set_int(value, l != r);
 	}
 	else if(node->u.oper == _OPER_LT) {
-		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET;
-		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET_L;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET_R;
 		expr_value_set_int(value, l < r);
 	}
 	else if(node->u.oper == _OPER_LE) {
-		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET;
-		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET_L;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET_R;
 		expr_value_set_int(value, l <= r);
 	}
 	else if(node->u.oper == _OPER_GT) {
-		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET;
-		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET_L;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET_R;
 		expr_value_set_int(value, l > r);
 	}
 	else if(node->u.oper == _OPER_GE) {
-		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET;
-		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET_L;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET_R;
 		expr_value_set_int(value, l >= r);
 	}
 	else if(node->u.oper == _OPER_SE) {
-		if(val_l.type != _DATA_TYPE_STR) goto ERROR_RET;
-		if(val_r.type != _DATA_TYPE_STR) goto ERROR_RET;
+		if(val_l.type != _DATA_TYPE_STR) goto ERROR_RET_L;
+		if(val_r.type != _DATA_TYPE_STR) goto ERROR_RET_R;
 		expr_value_set_int(value, strcmp(val_l.u.p, val_r.u.p) == 0);
 	}
 	else if(node->u.oper == _OPER_SNE) {
-		if(val_l.type != _DATA_TYPE_STR) goto ERROR_RET;
-		if(val_r.type != _DATA_TYPE_STR) goto ERROR_RET;
+		if(val_l.type != _DATA_TYPE_STR) goto ERROR_RET_L;
+		if(val_r.type != _DATA_TYPE_STR) goto ERROR_RET_R;
 		expr_value_set_int(value, strcmp(val_l.u.p, val_r.u.p) != 0);
 	}
 	else if(node->u.oper == _OPER_CE) {
 		/* !!! 忽略大小写 */
-		if(val_l.type != _DATA_TYPE_STR) goto ERROR_RET;
-		if(val_r.type != _DATA_TYPE_STR) goto ERROR_RET;
+		if(val_l.type != _DATA_TYPE_STR) goto ERROR_RET_L;
+		if(val_r.type != _DATA_TYPE_STR) goto ERROR_RET_R;
 		expr_value_set_int(value, strcmp(val_l.u.p, val_r.u.p) == 0);
 	}
 	else if(node->u.oper == _OPER_CNE) {
 		/* !!! 忽略大小写 */
-		if(val_l.type != _DATA_TYPE_STR) goto ERROR_RET;
-		if(val_r.type != _DATA_TYPE_STR) goto ERROR_RET;
+		if(val_l.type != _DATA_TYPE_STR) goto ERROR_RET_L;
+		if(val_r.type != _DATA_TYPE_STR) goto ERROR_RET_R;
 		expr_value_set_int(value, strcmp(val_l.u.p, val_r.u.p) != 0);
 	}
 	else if(node->u.oper == _OPER_AND) {
-		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET;
-		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET_L;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET_R;
 		expr_value_set_int(value, l && r);
 	}
 	else if(node->u.oper == _OPER_OR) {
-		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET;
-		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET_L;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET_R;
 		expr_value_set_int(value, l || r);
 	}
 	else if(node->u.oper == _OPER_NOT) {
-		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET;
+		if(_get_number_value(&val_r, &r) < 0) goto ERROR_RET_R;
 		expr_value_set_int(value, !r);
 	}
 	else {
-		goto ERROR_RET;
+		goto ERROR_RET_OPER;
 	}
 
 	ret = 0;
+	goto RET;
+
+ERROR_RET_L:
+	printf("[error] expr_parser.c:%d , left param wrong, at exp_str:%lu ^%s\n", __LINE__, node->offset, cfg->text);
+	goto ERROR_RET;
+ERROR_RET_R:
+	printf("[error] expr_parser.c:%d , right param wrong, at exp_str:%lu ^%s\n", __LINE__, node->offset, cfg->text);
+	goto ERROR_RET;
+ERROR_RET_OPER:
+	printf("[error] expr_parser.c:%d ,  at exp_str:%lu ^%s\n", __LINE__, node->offset, cfg->text);
+	goto ERROR_RET;
 ERROR_RET:
+	ret = -1;
+	goto RET;
+RET:
 	expr_value_clear(&val_l);
 	expr_value_clear(&val_r);
 	return ret;

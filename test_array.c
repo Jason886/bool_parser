@@ -17,16 +17,18 @@ void out_put_string(array_t *arr, char **p_ele, size_t idx)
 
 void test_array()
 {
-	array_t str_arr;
-	string_array_init(&str_arr);
-
-	printf("empty = %d\n", array_empty(&str_arr));
-
 	int a=3, b=6, c=2;
 	char * aa = "hello";
 	char * bb = "world";
 	char * cc = "bye";
 	char * dd = "what";
+	char * result = 0;
+	
+	array_t str_arr;
+	string_array_init(&str_arr);
+
+	printf("empty = %d\n", array_empty(&str_arr));
+
 	string_array_push_back(&str_arr, "hello");
 	string_array_push_back(&str_arr, "world");
 	string_array_push_back(&str_arr, "bye");
@@ -46,7 +48,6 @@ void test_array()
 
 	string_array_foreach(&str_arr, out_put_string);
 
-	char * result = 0;
 	array_at(&str_arr, 3, &result);
 
 	printf("at 3: %s\n", result);

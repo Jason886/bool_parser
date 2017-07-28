@@ -40,24 +40,24 @@ void array_foreach_reverse(array_t *arr, array_foreach_callback cb);
 
 
 #define ARRAY_DEFINE(T, pre) \
-static inline int pre##_array_init(array_t *arr) { \
+static int pre##_array_init(array_t *arr) { \
 	return array_init(arr, sizeof(T)); \
 } \
-static inline int pre##_array_push_back(array_t *arr, T e) { \
+static int pre##_array_push_back(array_t *arr, T e) { \
 	return array_push_back(arr, &e); \
 } \
-static inline int pre##_array_push_back_ref(array_t *arr, T*e) { \
+static int pre##_array_push_back_ref(array_t *arr, T*e) { \
 	return array_push_back(arr, e); \
 } \
-static inline int pre##_array_insert(array_t *arr, T e, size_t idx) { \
+static int pre##_array_insert(array_t *arr, T e, size_t idx) { \
 	return array_insert(arr, &e, idx); \
 } \
 typedef void (* pre##_array_foreach_callback)(array_t *arr, T *p_ele, size_t idx);\
-static inline void pre##_array_foreach(array_t * arr, pre##_array_foreach_callback cb) { \
-	return array_foreach(arr, (array_foreach_callback) cb); \
+static void pre##_array_foreach(array_t * arr, pre##_array_foreach_callback cb) { \
+	array_foreach(arr, (array_foreach_callback) cb); \
 } \
-static inline void pre##_array_foreach_reverse(array_t *arr, pre##_array_foreach_callback cb) { \
-	return array_foreach_reverse(arr, (array_foreach_callback) cb); \
+static void pre##_array_foreach_reverse(array_t *arr, pre##_array_foreach_callback cb) { \
+	array_foreach_reverse(arr, (array_foreach_callback) cb); \
 }
 
 

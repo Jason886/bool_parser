@@ -37,7 +37,7 @@ void array_erase(array_t *arr, size_t idx);
 void array_clear(array_t *arr);
 void array_foreach(array_t *arr, array_foreach_callback cb);
 void array_foreach_reverse(array_t *arr, array_foreach_callback cb);
-
+/*
 #define arr_init(T, arr) array_init(arr, sizeof(T))
 #define arr_uinit(arr) array_uinit(arr)
 #define arr_cap(arr) array_capacity(arr)
@@ -66,6 +66,7 @@ void array_foreach_reverse(array_t *arr, array_foreach_callback cb);
 #define arr_clear(arr) array_clear(arr, idx)
 #define arr_for(arr, cb) array_foreach(arr, (array_foreach_callback)(cb))
 #define arr_rfor(arr, cb) array_foreach_reverse(arr, (array_foreach_callback)(cb));
+*/
 
 #define ARRAY_DEFINE(T, pre) \
 static int pre##_array_init(array_t *arr) { \

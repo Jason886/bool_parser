@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
-int get_value(char *varname, expr_value_t * value) {
+int get_value(char *varname, expr_value_t * value, void *usrdata) {
 	assert(varname);
 	assert(value);
 	printf("varname = %s\n", varname);
@@ -39,7 +39,7 @@ int get_value(char *varname, expr_value_t * value) {
 int main()
 {
 	expr_parser * parser = expr_parser_new();
-	expr_parser_parse(parser, (char *)"[[a]] > $b.a[5]||hello_c<$d&&(e>=-179.4.)||!world_c");
+	expr_parser_parse(parser, (char *)"[[a]] -se $b.a[5]||hello_c<$d&&(e>=-179.4.)||!world_c");
 	/*
 	expr_parser_parse(parser, (char*)"a > b && ! e");
 	expr_parser_parse(parser, (char *)"('hello'-sne \"hell\")");
@@ -48,7 +48,7 @@ int main()
 	printf("\nend\n");
 	if(0 != parser) {
 		int result;
-		if( expr_parser_execute(parser, &result, get_value) == 0) {
+		if( expr_parser_execute(parser, &result, get_value, NULL) == 0) {
 			printf("result = %d\n", result);
 		}	
 		expr_parser_delete(parser);

@@ -12,13 +12,14 @@ extern "C" {
 
 typedef struct expr_parser expr_parser;
 typedef struct expr_value_t expr_value_t;
-typedef int (*expr_value_getter)(char * varname, expr_value_t *value);
+typedef int (*expr_value_getter)(char * varname, expr_value_t *value, void *usrdata);
 
 extern expr_parser * expr_parser_new();
 extern void expr_parser_delete(expr_parser *parser);
 extern void expr_parser_reset(expr_parser *parser);
 extern void expr_parser_parse(expr_parser * parser, char *exp_str);
-extern int expr_parser_execute(expr_parser *parser, int *result,  expr_value_getter getter);
+extern int expr_parser_execute(expr_parser *parser, int *result,\
+		expr_value_getter getter, void * usrdata);
 extern char * expr_parser_err_text(expr_parser *parser);
 extern void expr_parser_print_tree(expr_parser *parser);
 

@@ -35,6 +35,21 @@ static void __expr_log_err(size_t line, char *fmt, ...) {
 	printf("\n");
 }
 
+static int strcasecmp(const char* s1, const char* s2) {
+	char c1, c2;
+	do { c1 = *s1++; c2 = *s2++; }
+	while (c1 && c2 && (tolower(c1) == tolower(c2)));
+	return tolower(c1) - tolower(c2);
+}
+
+static int strncasecmp(const char* s1, const char* s2, size_t n) {
+	char c1, c2;
+	if (!n) return 0;
+	do { c1 = *s1++; c2 = *s2++; }
+	while (--n && c1 && c2 && (tolower(c1) == tolower(c2)));
+	return tolower(c1) - tolower(c2);
+}
+
 /*
  * 运算符枚举
  */
@@ -836,16 +851,14 @@ static int _execute_oper_node(expr_node_t *node, expr_value_t * value, \
 		expr_value_set_int(value, strcmp(val_l.u.p, val_r.u.p) != 0);
 	}
 	else if(node->u.oper == _OPER_CE) {
-		/* !!! 忽略大小写 */
 		if(val_l.type != _DATA_TYPE_STR) goto ERROR_RET_L;
 		if(val_r.type != _DATA_TYPE_STR) goto ERROR_RET_R;
-		expr_value_set_int(value, strcmp(val_l.u.p, val_r.u.p) == 0);
+		expr_value_set_int(value, strcasecmp(val_l.u.p, val_r.u.p) == 0);
 	}
 	else if(node->u.oper == _OPER_CNE) {
-		/* !!! 忽略大小写 */
 		if(val_l.type != _DATA_TYPE_STR) goto ERROR_RET_L;
 		if(val_r.type != _DATA_TYPE_STR) goto ERROR_RET_R;
-		expr_value_set_int(value, strcmp(val_l.u.p, val_r.u.p) != 0);
+		expr_value_set_int(value, strcasecmp(val_l.u.p, val_r.u.p) != 0);
 	}
 	else if(node->u.oper == _OPER_AND) {
 		if(_get_number_value(&val_l, &l) < 0) goto ERROR_RET_L;

@@ -15,7 +15,7 @@ int get_value(char *varname, expr_value_t * value, void *usrdata) {
 		expr_value_set_str(value, "hello", strlen("hello"));
 	}
 	else if(strcmp(varname, "b.a[5]") == 0) {
-		expr_value_set_str(value, "ab", strlen("ab"));
+		expr_value_set_str(value, "a", strlen("a"));
 	}
 	else if(strcmp(varname, "hello_c") == 0) {
 		expr_value_set_int(value, 36.67777);
@@ -27,7 +27,7 @@ int get_value(char *varname, expr_value_t * value, void *usrdata) {
 		expr_value_set_double(value, -178);
 	}
 	else if(strcmp(varname, "world_c") ==0) {
-		expr_value_set_int(value, 1);
+		expr_value_set_int(value, 0);
 	}
 	else {
 		return -1;
@@ -38,7 +38,7 @@ int get_value(char *varname, expr_value_t * value, void *usrdata) {
 int main()
 {
 	expr_parser * parser = expr_parser_new();
-	expr_parser_parse(parser, (char *)"[[a]] -se $b.a[5]||hello_c<$d&&(e>=-179.4.)||!world_c");
+	expr_parser_parse(parser, (char *)"[[Ab]] -cne $b.a[5] && hello_c<$d&&(e>=-179.4.) && !world_c");
 	/*
 	expr_parser_parse(parser, (char*)"a > b && ! e");
 	expr_parser_parse(parser, (char *)"('hello'-sne \"hell\")");

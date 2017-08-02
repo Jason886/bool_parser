@@ -641,11 +641,15 @@ void expr_parser_reset(expr_parser *parser) {
 	}
 }
 
-void expr_parser_parse(expr_parser * parser, char *exp_str) {
+int expr_parser_parse(expr_parser * parser, char *exp_str) {
 	if(parser) {
 		expr_parser_reset(parser);
 		parser->root = _parse_it(exp_str, &parser->_ndstack);
+		if(parser->root) {
+			return 0;
+		}
 	}
+	return -1;
 }
 
 static int _execute_data_node(expr_node_t *node, expr_value_t * value, 

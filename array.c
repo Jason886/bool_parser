@@ -1,3 +1,8 @@
+/**
+ * author: jason886
+ * link: https://github.com/Jason886/expr_parser.git
+ *
+ */
 #include <stdlib.h>
 #include <assert.h>
 #include <memory.h>

@@ -1,3 +1,8 @@
+/**
+ * author: jason886
+ * link: https://github.com/Jason886/expr_parser.git
+ *
+ */
 #ifndef _ARRAY_H_
 #define _ARRAY_H_
 

@@ -1,3 +1,8 @@
+/**
+ * author: jason886
+ * link: https://github.com/Jason886/expr_parser.git
+ *
+ */
 #include "array.h"
 #include "expr_parser.h"
 #include <stdlib.h>

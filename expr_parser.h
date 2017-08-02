@@ -23,9 +23,8 @@ extern expr_parser * expr_parser_new();
 extern void expr_parser_delete(expr_parser *parser);
 extern void expr_parser_reset(expr_parser *parser);
 extern int expr_parser_parse(expr_parser * parser, char *exp_str);
-extern int expr_parser_execute(expr_parser *parser, int *result,\
+extern int expr_parser_execute(expr_parser *parser, int *result, \
 		expr_value_getter getter, void * usrdata);
-extern char * expr_parser_err_text(expr_parser *parser);
 extern void expr_parser_print_tree(expr_parser *parser);
 
 extern void expr_value_set_int(expr_value_t *value, int64_t n);

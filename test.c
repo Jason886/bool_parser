@@ -5,7 +5,6 @@
 int get_value(char *varname, expr_value_t * value, void *usrdata) {
 	assert(varname);
 	assert(value);
-	printf("varname = %s\n", varname);
 	if(strcmp(varname, "var_int") == 0) {
 		expr_value_set_int(value, 35);
 	}

@@ -13,7 +13,7 @@
 #include <assert.h>
 #include <stdarg.h>
 
-#define __EXPR_LOG
+/* #define __EXPR_LOG */
 #ifdef __EXPR_LOG
 static void __expr_log_info(char *fmt, ...) {
 	va_list args;
@@ -25,6 +25,15 @@ static void __expr_log_info(char *fmt, ...) {
 static void __expr_log_info(char *fmt, ...) {
 }
 #endif
+
+static void __expr_log_err(size_t line, char *fmt, ...) {
+	va_list args;
+	printf("[error] %s:%lu, ", __FILE__, line);
+	va_start(args, fmt);
+	vprintf(fmt, args);
+	va_end(args);
+	printf("\n");
+}
 
 /*
  * 运算符枚举
@@ -126,7 +135,7 @@ ARRAY_DEFINE(expr_node_t *, node)
 
 static array_t _opercfgs;
 
-static opercfg_t _new_opercfg(int oper, char * text, int need_left, int need_right,\
+static opercfg_t _new_opercfg(int oper, char * text, int need_left, int need_right, \
 		int priority_l, int priority_r) {
 	opercfg_t cfg = {0};
 	cfg.oper = oper;
@@ -278,7 +287,7 @@ expr_node_t * _pick_oper(char * exp_str, size_t * cursor) {
 				node->offset = *cursor;
 			}
 			(*cursor) += len;
-			__expr_log_info("oper: %s end: %lu\n", cfg.text, (*cursor));
+			__expr_log_info("oper:%s, end:%lu.\n", cfg.text, (*cursor));
 			return node;
 		}
 	}
@@ -363,7 +372,7 @@ static expr_node_t * _pick_data(char *exp_str, size_t *cursor) {
 		node->offset = *cursor;
 	}
 	
-	__expr_log_info("data:%s end:%d\n", data, end);
+	__expr_log_info("data:%s ,end:%d.\n", data, end);
 
 	*cursor = end;
 	return node;
@@ -427,8 +436,8 @@ static int _deal_brk_r(array_t * ndstack, expr_node_t * brk_node) {
 		if(0 == pre_oper) {
 			if(array_size(ndstack) > 1) {
 				/* error */
-				printf("[error] expr_parser.c:%d, at exp_str:%lu unmatch ^) \n",\
-						__LINE__, brk_node->offset);
+				__expr_log_err(__LINE__, "exp_str:%lu, unmatch with ')'.", \
+						brk_node->offset);
 				return -1;
 			}
 			return 0;
@@ -436,8 +445,8 @@ static int _deal_brk_r(array_t * ndstack, expr_node_t * brk_node) {
 		if(_OPER_BRK_L == pre_oper->u.oper) {
 			if(array_size(ndstack)-pre_oper_idx > 2) {
 				/* error */
-				printf("[error] expr_parser.c:%d, at exp_str:%lu more than 1 param in ^()\n",\
-						__LINE__, pre_oper->offset);
+				__expr_log_err(__LINE__, "exp_str:%lu, more than 1 param in '()'.", \
+						pre_oper->offset);
 				return -1;
 			}
 			_free_node(pre_oper);
@@ -448,8 +457,8 @@ static int _deal_brk_r(array_t * ndstack, expr_node_t * brk_node) {
 		if(array_size(ndstack)-pre_oper_idx<=1) {
 			/* error */
 			opercfg_t * cfg = _opercfg_of(pre_oper->u.oper);
-			printf("[error] expr_parser.c:%d, at exp_str:%lu need param after ^%s\n", \
-					__LINE__, pre_oper->offset, cfg->text);
+			__expr_log_err(__LINE__, "exp_str:%lu, need param after '%s'.", \
+					pre_oper->offset, cfg->text);
 			return -1;
 		}
 		right = 0;
@@ -467,8 +476,8 @@ static int _link_left(array_t* ndstack, expr_node_t * link_node, size_t idx) {
 	if(cfg->need_left) {
 		if(array_size(ndstack) == 0) {
 			/* error */
-			printf("[error] expr_parser.c:%d, at exp_str:%lu need param before ^%s\n", \
-					__LINE__, link_node->offset, cfg->text);
+			__expr_log_err(__LINE__, "exp_str:%lu, need param before '%s'.", \
+					link_node->offset, cfg->text);
 			return -1;
 		}
 		left = 0;
@@ -477,8 +486,8 @@ static int _link_left(array_t* ndstack, expr_node_t * link_node, size_t idx) {
 			opercfg_t * leftcfg = _opercfg_of(left->u.oper);
 			if(leftcfg->need_right && 0 == left->right) {
 				/* error */
-				printf("[error] expr_parser.c:%d, at exp_str:%lu need param before ^%s\n",\
-						__LINE__, link_node->offset, cfg->text);
+				__expr_log_err(__LINE__, "exp_str:%lu, need param before '%s'.", \
+						link_node->offset, cfg->text);
 				return -1;
 			}
 		}
@@ -495,8 +504,8 @@ static int _link_right(array_t* ndstack, expr_node_t * link_node, size_t idx) {
 	if(cfg->need_right) {
 		if(idx == array_size(ndstack) -1) {
 			/* error */
-			printf("[error] expr_parser.c:%d, at exp_str:%lu need param after ^%s\n", \
-					__LINE__, link_node->offset, cfg->text);
+			__expr_log_err(__LINE__, "exp_str:%lu, need param after '%s'.", \
+					link_node->offset, cfg->text);
 			return -1;
 		}
 		right = 0;
@@ -559,12 +568,12 @@ static int _deal_end(array_t * ndstack) {
 		if(0 == pre_oper) {
 			if(array_size(ndstack) > 1) {
 				/* error */
-				printf("[error] expr_parser.c:%d, too many values. \n", __LINE__);
+				__expr_log_err(__LINE__, "too many values.");
 				return -1;
 			}
 			if(array_size(ndstack) == 0) {
 				/* error */
-				printf("[error] expr_parser.c:%d, no value.\n", __LINE__);
+				__expr_log_err(__LINE__, "no value.");
 				return -1;
 			}
 			return 0;
@@ -572,16 +581,16 @@ static int _deal_end(array_t * ndstack) {
 		if(_OPER_BRK_L == pre_oper->u.oper) {
 			/* error */
 			opercfg_t * cfg = _opercfg_of(pre_oper->u.oper);
-			printf("[error] expr_parser.c:%d, at exp_str:%lu unmatch with ^%s\n", \
-					__LINE__, pre_oper->offset, cfg->text);
+			__expr_log_err(__LINE__, "exp_str:%lu, unmatch with '%s'.", \
+					pre_oper->offset, cfg->text);
 			return -1;
 		}
 
 		if(array_size(ndstack)-pre_oper_idx<=1) {
 			/* error */
 			opercfg_t * cfg = _opercfg_of(pre_oper->u.oper);
-			printf("[error] expr_parser.c:%d, at exp_str:%lu need param after ^%s\n", \
-					__LINE__, pre_oper->offset, cfg->text);
+			__expr_log_err(__LINE__, "exp_str:%lu, need param after '%s'.", \
+					pre_oper->offset, cfg->text);
 			return -1;
 		}
 		right = 0;
@@ -601,8 +610,8 @@ static expr_node_t * _parse_it(char *exp_str, array_t * ndstack) {
 		if(!node) {
 			if(exp_str[cursor] != '\0') {
 				/* error */
-				printf("[error] expr_parser.c:%d, at exp_str:%lu, unrecognized character:^%c\n", \
-						__LINE__, cursor, exp_str[cursor]);
+				__expr_log_err(__LINE__, "exp_str:%lu, unrecognized character '%c'.", \
+						cursor, exp_str[cursor]);
 				_clear_stack(ndstack);
 				return 0;
 			}
@@ -657,13 +666,13 @@ int expr_parser_parse(expr_parser * parser, char *exp_str) {
 	return -1;
 }
 
-static int _execute_data_node(expr_node_t *node, expr_value_t * value, 
+static int _execute_data_node(expr_node_t *node, expr_value_t * value, \
 		expr_value_getter getter, void * usrdata) {
 	char varname[1024] = {0};
 	if(strncmp(node->u.data, "$", 1) == 0) {
 		if(getter((char *)node->u.data+1, value, usrdata) < 0) {
-			printf("[error] expr_parser.c:%d, getter value error, varname=%s\n", \
-					__LINE__, node->u.data);
+			__expr_log_err(__LINE__, "value getter error, varname=%s.", \
+					node->u.data);
 			return -1;
 		}
 		return 0;
@@ -720,8 +729,8 @@ static int _execute_data_node(expr_node_t *node, expr_value_t * value,
 			}
 			else {
 				if(getter((char *)node->u.data, value, usrdata) < 0) {
-					printf("[error] expr_parser.c:%d, getter value error, varname=%s\n", \
-							__LINE__, node->u.data);
+					__expr_log_err(__LINE__, "value getter error, varname=%s.", \
+							node->u.data);
 					return -1;
 				}
 			}
@@ -750,11 +759,12 @@ static int _execute_oper_node(expr_node_t *node, expr_value_t * value, \
 	int ret = -1;
 	double l=0, r=0;
 	expr_value_t val_l = {0}, val_r = {0};
-	opercfg_t *cfg;
-	expr_node_t *left, *right;
+	opercfg_t *cfg = 0;
+	expr_node_t *left = 0, *right = 0;
 	
 	assert(node);
 	assert(value);
+
 	memset(&val_l, 0x00, sizeof(val_l));
 	memset(&val_r, 0x00, sizeof(val_r));
 	left = node->left; right = node->right;
@@ -854,47 +864,55 @@ static int _execute_oper_node(expr_node_t *node, expr_value_t * value, \
 	else {
 		goto ERROR_RET_OPER;
 	}
-
+	
 	ret = 0;
 	goto RET;
 
 ERROR_RET_L:
-	printf("[error] expr_parser.c:%d , left param wrong, at exp_str:%lu ^%s\n", \
-			__LINE__, node->offset, cfg->text);
+	__expr_log_err(__LINE__, "exp_str:%lu, invalid left param with '%s'.", \
+			node->offset, cfg->text);
 	goto ERROR_RET;
 ERROR_RET_R:
-	printf("[error] expr_parser.c:%d , right param wrong, at exp_str:%lu ^%s\n", \
-			__LINE__, node->offset, cfg->text);
+	__expr_log_err(__LINE__, "exp_str:%lu, invalid right param with '%s'.", \
+			node->offset, cfg->text);
 	goto ERROR_RET;
 ERROR_RET_OPER:
-	printf("[error] expr_parser.c:%d ,  at exp_str:%lu ^%s\n", \
-			__LINE__, node->offset, cfg->text);
+	__expr_log_err(__LINE__, "exp_str:%lu, '%s'.", \
+			node->offset, cfg->text);
 	goto ERROR_RET;
 ERROR_RET:
 	ret = -1;
-	goto RET;
 RET:
 	expr_value_clear(&val_l);
 	expr_value_clear(&val_r);
 	return ret;
 }
 
-int expr_parser_execute(expr_parser *parser, int *result, expr_value_getter getter,\
+int expr_parser_execute(expr_parser *parser, int *result, expr_value_getter getter, \
 		void * usrdata) {
 	int ret = -1;
 	expr_value_t value; 
 	assert(parser);
 	memset(&value,0x00, sizeof(value));
-	if(!parser->root) goto ERR_RET;
-	if(parser->root->type != _NODE_TYPE_OPER) goto ERR_RET; 
+	if(!parser->root) {
+		goto ERR_RET;
+	}
+	if(parser->root->type != _NODE_TYPE_OPER) {
+		goto ERR_RET;
+	}
 	if(_execute_oper_node(parser->root, &value, getter, usrdata) < 0) {
 		goto ERR_RET;
 	}
-	if(value.type != _DATA_TYPE_INT) { goto ERR_RET; }
+	if(value.type != _DATA_TYPE_INT) {
+		goto ERR_RET;
+	}
 	*result = (int)value.u.n;
 
 	ret = 0;
+	goto RET;
 ERR_RET:
+	ret = -1;
+RET:
 	expr_value_clear(&value);
 	return ret;
 }
@@ -907,7 +925,6 @@ void expr_parser_print_tree(expr_parser *parser) {
 		}
 	}
 }
-
 
 void expr_value_set_int(expr_value_t *value, int64_t n) {
 	assert(value);

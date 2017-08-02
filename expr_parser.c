@@ -898,6 +898,7 @@ int expr_parser_execute(expr_parser *parser, int *result, expr_value_getter gett
 		goto ERR_RET;
 	}
 	if(parser->root->type != _NODE_TYPE_OPER) {
+		__expr_log_err(__LINE__, "executable!");
 		goto ERR_RET;
 	}
 	if(_execute_oper_node(parser->root, &value, getter, usrdata) < 0) {
